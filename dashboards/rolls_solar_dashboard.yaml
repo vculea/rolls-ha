@@ -4,199 +4,19 @@
 # ⚠️  RECOMANDAT: folosește dashboard-ul AUTO-GENERAT în loc de acesta!
 #
 # La fiecare pornire HA, integrarea generează automat un dashboard complet
-# cu entity ID-urile reale la:
-#   <config>/www/rolls_ha_dashboard.yaml
-#
-# Importă-l în HA: Settings → Dashboards → Add dashboard → From YAML
-#   → copiază conținutul fișierului www/rolls_ha_dashboard.yaml
-#
-# ── Entity IDs (pentru instalări noi cu suggested_object_id) ─────────────────
-#
-# Entități globale (generate cu suggested_object_id fix):
-#   sensor.rolls_surplus_solar
-#   switch.rolls_control_automat
-#   number.rolls_putere_motor
-#   number.rolls_timp_stabilizare
-#
-# Entități per jaluzea (slug = entity_id fără domeniu, ex: dormitor_rasarit):
-#   sensor.rolls_status_<slug>
-#   switch.rolls_activ_<slug>
-#   number.rolls_pozitie_<slug>
-#
-# Entități Shelly EM: verifică în Developer Tools → States
-# ─────────────────────────────────────────────────────────────────────────────
-
-title: Jaluzele Solare
-path: jaluzele-solare
-icon: mdi:window-shutter-open
-badges: []
-cards:
-  # ── Titlu ────────────────────────────────────────────────────────────────────
-  - type: markdown
-    content: |
-      ## 🪟 Rolls Solar Controller
-      Jaluzele deschise automat din surplus fotovoltaic.
-
-  # ── Producție · Rețea · Surplus ─────────────────────────────────────────────
-  - type: grid
-    columns: 3
-    square: false
-    cards:
-      - type: tile
-        entity: sensor.shelly_em_channel_1_power    # ← înlocuiește cu senzorul tău
-        name: Producție
-        icon: mdi:solar-power
-        color: amber
-      - type: tile
-        entity: sensor.shelly_em_channel_2_power    # ← înlocuiește cu senzorul tău
-        name: Rețea
-        icon: mdi:transmission-tower
-        color: blue
-      - type: tile
-        entity: sensor.rolls_surplus_solar
-        name: Surplus
-        icon: mdi:solar-power-variant
-        color: green
-
-  # ── Control automat + jaluzele deschise ──────────────────────────────────────
-  - type: grid
-    columns: 2
-    square: false
-    cards:
-      - type: tile
-        entity: switch.rolls_control_automat
-        name: Control automat
-        icon: mdi:robot-outline
-        color: green
-      - type: tile
-        entity: sensor.rolls_surplus_solar
-        name: Deschise azi
-        icon: mdi:window-shutter-open
-        attribute: jaluzele_deschise
-
-  # ── Setări globale ───────────────────────────────────────────────────────────
-  - type: entities
-    title: Setări automatizare
-    show_header_toggle: false
-    state_color: true
-    entities:
-      - entity: number.rolls_putere_motor
-        name: Prag motor (W)
-        icon: mdi:flash
-      - entity: number.rolls_timp_stabilizare
-        name: Stabilizare (s)
-        icon: mdi:timer-outline
-
-  # ════════════════════════════════════════════════════════════════════════════
-  # JALUZELE — duplică blocul de mai jos pentru fiecare jaluzea
-  # Înlocuiește dormitor_rasarit cu slug-ul tău (entity_id fără "cover.")
-  # ════════════════════════════════════════════════════════════════════════════
-
-  # ── Jaluzea 1: Dormitor Răsărit ──────────────────────────────────────────────
-  - type: markdown
-    content: "### Dormitor Răsărit"
-
-  - type: grid
-    columns: 3
-    square: false
-    cards:
-      - type: tile
-        entity: cover.dormitor_rasarit
-        name: Jaluzea
-        icon: mdi:window-shutter
-      - type: tile
-        entity: sensor.rolls_status_cover_dormitor_rasarit
-        name: Status
-        icon: mdi:robot-outline
-      - type: gauge
-        entity: cover.dormitor_rasarit
-        name: Poziție
-        attribute: current_position
-        min: 0
-        max: 100
-        needle: false
-        severity:
-          green: 60
-          yellow: 20
-          red: 0
-
-  - type: entities
-    title: Dormitor Răsărit — control
-    show_header_toggle: false
-    state_color: true
-    entities:
-      - entity: switch.rolls_activ_cover_dormitor_rasarit
-        name: Include în automatizare
-      - entity: number.rolls_pozitie_cover_dormitor_rasarit
-        name: Deschidere țintă (%)
-      - type: attribute
-        entity: sensor.rolls_status_cover_dormitor_rasarit
-        attribute: pozitie
-        name: Poziție curentă (%)
-        icon: mdi:percent
-      - type: attribute
-        entity: sensor.rolls_status_cover_dormitor_rasarit
-        attribute: stare_cover
-        name: Stare cover
-        icon: mdi:window-shutter
-      - type: attribute
-        entity: sensor.rolls_status_cover_dormitor_rasarit
-        attribute: este_deschisa
-        name: Este deschisă
-        icon: mdi:check-circle
-      - type: attribute
-        entity: sensor.rolls_status_cover_dormitor_rasarit
-        attribute: stare_automatizare
-        name: Stare automatizare
-        icon: mdi:state-machine
-
-  # ── Jaluzea 2, 3... (duplică blocul de mai sus) ──────────────────────────────
-
-  # ════════════════════════════════════════════════════════════════════════════
-
-  # ── Activitate recentă ───────────────────────────────────────────────────────
-  - type: markdown
-    title: Activitate recentă
-    content: >-
-      {% set log = state_attr('sensor.rolls_surplus_solar', 'action_log') | default([]) %}
-      {% if log %}
-      {% for line in log %}
-      `{{ line }}`
-
-      {% endfor %}
-      {% else %}
-      _Nicio activitate înregistrată_
-      {% endif %}
-
-  # ── Grafic surplus + producție (2h) ──────────────────────────────────────────
-  - type: history-graph
-    title: Surplus solar (2h)
-    hours_to_show: 2
-    entities:
-      - entity: sensor.rolls_surplus_solar
-        name: Surplus (W)
-      - entity: sensor.shelly_em_channel_1_power    # ← înlocuiește cu senzorul tău
-        name: Producție (W)
-
-#
-# Cum se adaugă în HA:
-#   Settings → Dashboards → Add dashboard → From YAML → lipi conținutul
-#   SAU: editează un dashboard existent → Raw config editor → lipi conținutul
+# cu entity ID-urile reale la: <config>/www/rolls_ha_dashboard.yaml
 #
 # ── Entity IDs ───────────────────────────────────────────────────────────────
-# Înlocuiește entitățile marcate cu # ← cu ID-urile reale din instanța ta HA.
-# Le găsești în: Developer Tools → States → filtrează după "rolls"
-#
 # Pattern entități generate automat (device = "Rolls Solar Controller"):
 #   sensor.rolls_solar_controller_surplus_solar
-#   sensor.rolls_solar_controller_status_<cover_slug>
+#   sensor.rolls_solar_controller_status_<slug>
 #   switch.rolls_solar_controller_control_automat_solar
-#   switch.rolls_solar_controller_activ_<cover_slug>
+#   switch.rolls_solar_controller_activ_<slug>
 #   number.rolls_solar_controller_prag_putere_motor
 #   number.rolls_solar_controller_timp_stabilizare
-#   number.rolls_solar_controller_pozitie_deschidere_<cover_slug>
+#   number.rolls_solar_controller_pozitie_deschidere_<slug>
 #
-# Unde <cover_slug> = entity_id-ul cover-ului fără domeniu, ex:
+# Unde <slug> = entity_id cover fără domeniu, ex:
 #   cover.dormitor_rasarit → slug: dormitor_rasarit
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -264,72 +84,145 @@ cards:
         name: Stabilizare (s)
         icon: mdi:timer-outline
 
+  # ── Jaluzele — control rapid (sus / stop / jos) ──────────────────────────────
+  # Fiecare cover apare pe un rând cu butoanele sus / stop / jos + starea curentă.
+  # Adaugă aici toate cover-urile tale.
+  - type: entities
+    title: Jaluzele
+    show_header_toggle: false
+    entities:
+      - entity: cover.dormitor_rasarit
+        name: Dormitor Răsărit
+      # - entity: cover.dormitor_sud
+      #   name: Dormitor Sud
+      # - entity: cover.fineas
+      #   name: Fineas
+      # - entity: cover.fete
+      #   name: Fete
+      # ← adaugă restul cover-urilor tale
+
   # ════════════════════════════════════════════════════════════════════════════
-  # JALUZELE — repetă blocul de mai jos pentru fiecare jaluzea
+  # JALUZELE — detalii per entitate
+  # Fiecare vertical-stack grupează TOT ce ține de o singură jaluzea:
+  #   titlu + tile + status + gauge + setări de control
+  # Duplică blocul de mai jos pentru fiecare jaluzea, înlocuind slug-ul.
   # ════════════════════════════════════════════════════════════════════════════
 
   # ── Jaluzea 1: Dormitor Răsărit ──────────────────────────────────────────────
-  - type: markdown
-    content: "### Dormitor Răsărit"
-
-  - type: grid
-    columns: 3
-    square: false
+  - type: vertical-stack
     cards:
-      # Tile-ul nativ al cover-ului: arată starea + buton deschide/închide
-      - type: tile
-        entity: cover.dormitor_rasarit
-        name: Jaluzea
-        icon: mdi:window-shutter
+      - type: markdown
+        content: "### Dormitor Răsărit"
 
-      # Status automatizare
-      - type: tile
-        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-        name: Status
-        icon: mdi:robot-outline
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: tile
+            entity: cover.dormitor_rasarit
+            name: Jaluzea
+            icon: mdi:window-shutter
+          - type: tile
+            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+            name: Status
+            icon: mdi:robot-outline
+          - type: gauge
+            entity: cover.dormitor_rasarit
+            name: Poziție
+            attribute: current_position
+            min: 0
+            max: 100
+            needle: false
+            severity:
+              green: 60
+              yellow: 20
+              red: 0
 
-      # Poziție curentă — gauge rapid, fără template
-      - type: gauge
-        entity: cover.dormitor_rasarit
-        name: Poziție
-        attribute: current_position
-        min: 0
-        max: 100
-        needle: false
-        severity:
-          green: 60
-          yellow: 20
-          red: 0
+      - type: entities
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - entity: switch.rolls_solar_controller_activ_dormitor_rasarit
+            name: Include în automatizare
+          - entity: number.rolls_solar_controller_pozitie_deschidere_dormitor_rasarit
+            name: Deschidere țintă (%)
+          - type: attribute
+            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+            attribute: pozitie
+            name: Poziție curentă (%)
+            icon: mdi:percent
+          - type: attribute
+            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+            attribute: stare_cover
+            name: Stare cover
+            icon: mdi:window-shutter
+          - type: attribute
+            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+            attribute: este_deschisa
+            name: Este deschisă
+            icon: mdi:check-circle
+          - type: attribute
+            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+            attribute: stare_automatizare
+            name: Stare automatizare
+            icon: mdi:state-machine
 
-  - type: entities
-    title: Dormitor Răsărit — control
-    show_header_toggle: false
-    state_color: true
-    entities:
-      - entity: switch.rolls_solar_controller_activ_dormitor_rasarit
-        name: Include în automatizare
-      - entity: number.rolls_solar_controller_pozitie_deschidere_dormitor_rasarit
-        name: Deschidere țintă (%)
-      - type: attribute
-        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-        attribute: pozitie
-        name: Poziție curentă
-        icon: mdi:percent
-      - type: attribute
-        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-        attribute: stare_automatizare
-        name: Stare automatizare
-        icon: mdi:state-machine
-
-  # ── Jaluzea 2: (șterge sau duplică blocul de mai sus) ───────────────────────
-  # - type: markdown
-  #   content: "### Nume Jaluzea 2"
-  # ...
-
-  # ── Jaluzea 3: (șterge sau duplică blocul de mai sus) ───────────────────────
-  # - type: markdown
-  #   content: "### Nume Jaluzea 3"
-  # ...
+  # ── Jaluzea 2: (duplică blocul vertical-stack de mai sus) ───────────────────
+  # - type: vertical-stack
+  #   cards:
+  #     - type: markdown
+  #       content: "### Dormitor Sud"
+  #     - type: grid
+  #       columns: 3
+  #       square: false
+  #       cards:
+  #         - type: tile
+  #           entity: cover.dormitor_sud
+  #           name: Jaluzea
+  #           icon: mdi:window-shutter
+  #         - type: tile
+  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
+  #           name: Status
+  #           icon: mdi:robot-outline
+  #         - type: gauge
+  #           entity: cover.dormitor_sud
+  #           name: Poziție
+  #           attribute: current_position
+  #           min: 0
+  #           max: 100
+  #           needle: false
+  #           severity:
+  #             green: 60
+  #             yellow: 20
+  #             red: 0
+  #     - type: entities
+  #       show_header_toggle: false
+  #       state_color: true
+  #       entities:
+  #         - entity: switch.rolls_solar_controller_activ_dormitor_sud
+  #           name: Include în automatizare
+  #         - entity: number.rolls_solar_controller_pozitie_deschidere_dormitor_sud
+  #           name: Deschidere țintă (%)
+  #         - type: attribute
+  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
+  #           attribute: pozitie
+  #           name: Poziție curentă (%)
+  #           icon: mdi:percent
+  #         - type: attribute
+  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
+  #           attribute: stare_cover
+  #           name: Stare cover
+  #           icon: mdi:window-shutter
+  #         - type: attribute
+  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
+  #           attribute: este_deschisa
+  #           name: Este deschisă
+  #           icon: mdi:check-circle
+  #         - type: attribute
+  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
+  #           attribute: stare_automatizare
+  #           name: Stare automatizare
+  #           icon: mdi:state-machine
 
   # ════════════════════════════════════════════════════════════════════════════
 
