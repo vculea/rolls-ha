@@ -1,0 +1,182 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Rolls Solar Controller — Dashboard
+#
+# Cum se adaugă în HA:
+#   Settings → Dashboards → Add dashboard → From YAML → lipi conținutul
+#   SAU: editează un dashboard existent → Raw config editor → lipi conținutul
+#
+# ── Entity IDs ───────────────────────────────────────────────────────────────
+# Înlocuiește entitățile marcate cu # ← cu ID-urile reale din instanța ta HA.
+# Le găsești în: Developer Tools → States → filtrează după "rolls"
+#
+# Pattern entități generate automat (device = "Rolls Solar Controller"):
+#   sensor.rolls_solar_controller_surplus_solar
+#   sensor.rolls_solar_controller_status_<cover_slug>
+#   switch.rolls_solar_controller_control_automat_solar
+#   switch.rolls_solar_controller_activ_<cover_slug>
+#   number.rolls_solar_controller_prag_putere_motor
+#   number.rolls_solar_controller_timp_stabilizare
+#   number.rolls_solar_controller_pozitie_deschidere_<cover_slug>
+#
+# Unde <cover_slug> = entity_id-ul cover-ului fără domeniu, ex:
+#   cover.dormitor_rasarit → slug: dormitor_rasarit
+# ─────────────────────────────────────────────────────────────────────────────
+
+title: Jaluzele Solare
+path: jaluzele-solare
+icon: mdi:window-shutter-open
+badges: []
+cards:
+  # ── Titlu ────────────────────────────────────────────────────────────────────
+  - type: markdown
+    content: |
+      ## 🪟 Rolls Solar Controller
+      Jaluzele deschise automat din surplus fotovoltaic.
+
+  # ── Producție · Rețea · Surplus ─────────────────────────────────────────────
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: sensor.shelly_em_channel_1_power # ← senzor producție panouri
+        name: Producție
+        icon: mdi:solar-power
+        color: amber
+
+      - type: tile
+        entity: sensor.shelly_em_channel_2_power # ← senzor rețea (consum/export)
+        name: Rețea
+        icon: mdi:transmission-tower
+        color: blue
+
+      - type: tile
+        entity: sensor.rolls_solar_controller_surplus_solar
+        name: Surplus
+        icon: mdi:solar-power-variant
+        color: green
+
+  # ── Rezumat jaluzele ─────────────────────────────────────────────────────────
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: switch.rolls_solar_controller_control_automat_solar
+        name: Control automat
+        icon: mdi:robot-outline
+        color: green
+
+      - type: tile
+        entity: sensor.rolls_solar_controller_surplus_solar
+        name: Deschise azi
+        icon: mdi:window-shutter-open
+        attribute: jaluzele_deschise
+
+  # ── Setări globale ───────────────────────────────────────────────────────────
+  - type: entities
+    title: Setări automatizare
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: number.rolls_solar_controller_prag_putere_motor
+        name: Prag motor (W)
+        icon: mdi:flash
+      - entity: number.rolls_solar_controller_timp_stabilizare
+        name: Stabilizare (s)
+        icon: mdi:timer-outline
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JALUZELE — repetă blocul de mai jos pentru fiecare jaluzea
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── Jaluzea 1: Dormitor Răsărit ──────────────────────────────────────────────
+  - type: markdown
+    content: "### Dormitor Răsărit"
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      # Tile-ul nativ al cover-ului: arată starea + buton deschide/închide
+      - type: tile
+        entity: cover.dormitor_rasarit
+        name: Jaluzea
+        icon: mdi:window-shutter
+
+      # Status automatizare
+      - type: tile
+        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+        name: Status
+        icon: mdi:robot-outline
+
+      # Poziție curentă — gauge rapid, fără template
+      - type: gauge
+        entity: cover.dormitor_rasarit
+        name: Poziție
+        attribute: current_position
+        min: 0
+        max: 100
+        needle: false
+        severity:
+          green: 60
+          yellow: 20
+          red: 0
+
+  - type: entities
+    title: Dormitor Răsărit — control
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: switch.rolls_solar_controller_activ_dormitor_rasarit
+        name: Include în automatizare
+      - entity: number.rolls_solar_controller_pozitie_deschidere_dormitor_rasarit
+        name: Deschidere țintă (%)
+      - type: attribute
+        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+        attribute: pozitie
+        name: Poziție curentă
+        icon: mdi:percent
+      - type: attribute
+        entity: sensor.rolls_solar_controller_status_dormitor_rasarit
+        attribute: stare_automatizare
+        name: Stare automatizare
+        icon: mdi:state-machine
+
+  # ── Jaluzea 2: (șterge sau duplică blocul de mai sus) ───────────────────────
+  # - type: markdown
+  #   content: "### Nume Jaluzea 2"
+  # ...
+
+  # ── Jaluzea 3: (șterge sau duplică blocul de mai sus) ───────────────────────
+  # - type: markdown
+  #   content: "### Nume Jaluzea 3"
+  # ...
+
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── Activitate recentă ───────────────────────────────────────────────────────
+  - type: markdown
+    title: Activitate recentă
+    content: >-
+      {% set log = state_attr(
+        'sensor.rolls_solar_controller_surplus_solar', 'action_log'
+      ) | default([]) %}
+      {% if log %}
+      {% for line in log %}
+      `{{ line }}`
+
+      {% endfor %}
+      {% else %}
+      _Nicio activitate înregistrată_
+      {% endif %}
+
+  # ── Grafic surplus (2h) — fără refresh_interval pentru performanță ───────────
+  - type: history-graph
+    title: Surplus solar (2h)
+    hours_to_show: 2
+    entities:
+      - entity: sensor.rolls_solar_controller_surplus_solar
+        name: Surplus (W)
+      - entity: sensor.shelly_em_channel_1_power # ← producție
+        name: Producție (W)

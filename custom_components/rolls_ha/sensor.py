@@ -14,7 +14,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_COVERS
+from .const import DOMAIN, CONF_COVERS, COVER_STATE_AUTO_OPENED, COVER_STATE_OPENING
 from .coordinator import RollsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,10 +79,27 @@ class RollsSurplusSensor(CoordinatorEntity, SensorEntity):
         if self.coordinator.data is None:
             return {}
         data = self.coordinator.data
+        cover_states: dict = data.get("cover_states", {})
+        covers_list: list[str] = data.get("covers", [])
+
+        deschise = [
+            eid for eid in covers_list
+            if cover_states.get(eid) in (COVER_STATE_AUTO_OPENED, COVER_STATE_OPENING)
+        ]
+        in_asteptare = [
+            eid for eid in covers_list
+            if cover_states.get(eid) not in (
+                COVER_STATE_AUTO_OPENED, COVER_STATE_OPENING
+            )
+        ]
+
         return {
             "solar_power_w": data.get("solar_power"),
             "grid_export_w": data.get("grid_export"),
             "motor_power_w": data.get("motor_power"),
+            "jaluzele_deschise": len(deschise),
+            "jaluzele_deschise_lista": deschise,
+            "jaluzele_in_asteptare": len(in_asteptare),
             "action_log": data.get("action_log", []),
             "cycle_log": data.get("cycle_log", []),
         }
@@ -121,10 +138,31 @@ class RollsCoverStatusSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        if self.coordinator.data is None:
-            return {}
-        cover_states = self.coordinator.data.get("cover_states", {})
-        return {
-            "automation_state": cover_states.get(self._cover_entity_id),
-            "cover_entity_id": self._cover_entity_id,
-        }
+        attrs: dict = {}
+
+        # ── Starea live din dispozitivul cover (ex. Shelly Cover) ─────────
+        cover_state = self.hass.states.get(self._cover_entity_id)
+        if cover_state is not None:
+            pos = cover_state.attributes.get("current_position")
+            attrs["pozitie"] = pos  # 0–100 sau None dacă dispozitivul nu raportează
+            attrs["stare_cover"] = cover_state.state  # open/closed/opening/closing/stopped
+            attrs["este_deschisa"] = cover_state.state in ("open", "opening") or (
+                pos is not None and pos > 0
+            )
+            # Atribute suplimentare expuse de Shelly Cover (dacă există)
+            for extra_key in ("current_tilt_position", "stopped", "calibrated"):
+                val = cover_state.attributes.get(extra_key)
+                if val is not None:
+                    attrs[extra_key] = val
+        else:
+            attrs["pozitie"] = None
+            attrs["stare_cover"] = None
+            attrs["este_deschisa"] = None
+
+        # ── Starea internă a automatizării ────────────────────────────────
+        if self.coordinator.data is not None:
+            cover_states = self.coordinator.data.get("cover_states", {})
+            attrs["stare_automatizare"] = cover_states.get(self._cover_entity_id)
+
+        attrs["cover_entity_id"] = self._cover_entity_id
+        return attrs
