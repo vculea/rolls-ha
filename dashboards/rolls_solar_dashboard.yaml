@@ -148,21 +148,6 @@ cards:
             name: Deschidere țintă (%)
           - type: attribute
             entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-            attribute: pozitie
-            name: Poziție curentă (%)
-            icon: mdi:percent
-          - type: attribute
-            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-            attribute: stare_cover
-            name: Stare cover
-            icon: mdi:window-shutter
-          - type: attribute
-            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
-            attribute: este_deschisa
-            name: Este deschisă
-            icon: mdi:check-circle
-          - type: attribute
-            entity: sensor.rolls_solar_controller_status_dormitor_rasarit
             attribute: stare_automatizare
             name: Stare automatizare
             icon: mdi:state-machine
@@ -203,21 +188,6 @@ cards:
   #           name: Include în automatizare
   #         - entity: number.rolls_solar_controller_pozitie_deschidere_dormitor_sud
   #           name: Deschidere țintă (%)
-  #         - type: attribute
-  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
-  #           attribute: pozitie
-  #           name: Poziție curentă (%)
-  #           icon: mdi:percent
-  #         - type: attribute
-  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
-  #           attribute: stare_cover
-  #           name: Stare cover
-  #           icon: mdi:window-shutter
-  #         - type: attribute
-  #           entity: sensor.rolls_solar_controller_status_dormitor_sud
-  #           attribute: este_deschisa
-  #           name: Este deschisă
-  #           icon: mdi:check-circle
   #         - type: attribute
   #           entity: sensor.rolls_solar_controller_status_dormitor_sud
   #           attribute: stare_automatizare
