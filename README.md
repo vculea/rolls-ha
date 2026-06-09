@@ -217,7 +217,7 @@ Fișierul este regenerat la fiecare pornire a HA și la orice modificare de conf
 
 ### Card per jaluzea (generat automat)
 
-Fiecare jaluzea primește un `vertical-stack` cu trei sub-carduri:
+Fiecare jaluzea primește un `vertical-stack` cu două sub-carduri:
 
 ```yaml
 - type: vertical-stack
@@ -225,20 +225,6 @@ Fiecare jaluzea primește un `vertical-stack` cu trei sub-carduri:
     # ── Titlu ──────────────────────────────────────────────
     - type: markdown
       content: "### Bucatarie Nord"
-
-    # ── Stare rapidă: jaluzea + status automatizare ────────
-    - type: grid
-      columns: 2
-      square: false
-      cards:
-        - type: tile
-          entity: cover.bucatarie_nord
-          name: Jaluzea
-          icon: mdi:window-shutter
-        - type: tile
-          entity: sensor.status_bucatarie_nord
-          name: Status
-          icon: mdi:robot-outline
 
     # ── Control + setări ───────────────────────────────────
     - type: entities

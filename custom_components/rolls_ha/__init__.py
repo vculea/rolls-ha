@@ -151,19 +151,6 @@ async def _generate_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> None:
             f"      - type: markdown\n"
             f"        content: \"### {name}\"\n"
             f"\n"
-            f"      - type: grid\n"
-            f"        columns: 2\n"
-            f"        square: false\n"
-            f"        cards:\n"
-            f"          - type: tile\n"
-            f"            entity: {cover_eid}\n"
-            f"            name: Jaluzea\n"
-            f"            icon: mdi:window-shutter\n"
-            f"          - type: tile\n"
-            f"            entity: {sn_status}\n"
-            f"            name: Status\n"
-            f"            icon: mdi:robot-outline\n"
-            f"\n"
             f"      - type: entities\n"
             f"        show_header_toggle: false\n"
             f"        state_color: true\n"
@@ -182,22 +169,6 @@ async def _generate_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> None:
         )
 
     covers_yaml = "".join(cover_blocks)
-
-    # ── Card overview rapid (sus / stop / jos pentru toate jaluzelele) ──────
-    overview_entities = "\n".join(
-        f"      - entity: {c}\n        name: \"{_cover_friendly_name(c)}\""
-        for c in covers_list
-    )
-    overview_card = (
-        f"  # ── Jaluzele — control rapid (sus / stop / jos) "
-        f"{'─' * 29}\n"
-        f"  - type: entities\n"
-        f"    title: \"Jaluzele\"\n"
-        f"    show_header_toggle: false\n"
-        f"    entities:\n"
-        f"{overview_entities}\n"
-        f"\n"
-    )
 
     # ── Template Jinja2 pentru log (scăpăm {} cu dublare) ──────────────────
     log_entity = sn_surplus
@@ -282,7 +253,6 @@ async def _generate_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> None:
         f"        name: \"Stabilizare (s)\"\n"
         f"        icon: mdi:timer-outline\n"
         f"\n"
-        f"{overview_card}"
         f"  # ════════════════════════════════════════════════════════════════════\n"
         f"  # JALUZELE ({len(covers_list)} configurate) — fiecare grupat în vertical-stack\n"
         f"  # ════════════════════════════════════════════════════════════════════\n"
