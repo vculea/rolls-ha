@@ -10,6 +10,7 @@ jaluzelele pe rând, în ordinea configurată, fără să consume energie din re
 - [Cum e structurat codul](#structura-codului)
 - [Cum funcționează](#cum-funcționează)
 - [Entități create](#entități-create)
+- [Dashboard (Lovelace)](#dashboard-lovelace)
 - [Instalare](#instalare)
 - [Configurare](#configurare)
 - [Setări ajustabile](#setări-ajustabile)
@@ -186,6 +187,79 @@ Atributele `sensor.status_<jaluzea>` sunt citite **live** din entitatea cover su
 | `number.prag_putere_motor`            | 10–5000 W | 150 W   | Surplusul minim necesar pentru a porni un motor             |
 | `number.timp_stabilizare`             | 0–300 s   | 10 s    | Cât timp surplusul trebuie să fie stabil înainte de acțiune |
 | `number.pozitie_deschidere_<jaluzea>` | 10–100 %  | 100 %   | La ce procent se deschide jaluzea respectivă                |
+
+---
+
+## Dashboard (Lovelace)
+
+Integrarea **generează automat** un fișier de dashboard la:
+
+```
+<config>/www/rolls_ha_dashboard.yaml
+```
+
+Fișierul este regenerat la fiecare pornire a HA și la orice modificare de configurație.
+
+### Import dashboard
+
+**Settings → Dashboards → Add dashboard → From YAML** → selectează fișierul de mai sus.
+
+### Structura dashboard-ului generat
+
+| Secțiune      | Conținut                                                    |
+| ------------- | ----------------------------------------------------------- |
+| Header        | Producție · Rețea · Surplus (3 tile-uri)                    |
+| Control       | Control automat switch · Deschise azi (2 tile-uri)          |
+| Setări        | Prag motor (W) · Timp stabilizare (s)                       |
+| Control rapid | Toate jaluzelele cu butoane ↑ ■ ↓                           |
+| Per jaluzea   | Câte un `vertical-stack` pentru fiecare jaluzea configurată |
+| Footer        | Log activitate recentă · Grafic surplus 2h                  |
+
+### Card per jaluzea (generat automat)
+
+Fiecare jaluzea primește un `vertical-stack` cu trei sub-carduri:
+
+```yaml
+- type: vertical-stack
+  cards:
+    # ── Titlu ──────────────────────────────────────────────
+    - type: markdown
+      content: "### Bucatarie Nord"
+
+    # ── Stare rapidă: jaluzea + status automatizare ────────
+    - type: grid
+      columns: 2
+      square: false
+      cards:
+        - type: tile
+          entity: cover.bucatarie_nord
+          name: Jaluzea
+          icon: mdi:window-shutter
+        - type: tile
+          entity: sensor.status_bucatarie_nord
+          name: Status
+          icon: mdi:robot-outline
+
+    # ── Control + setări ───────────────────────────────────
+    - type: entities
+      show_header_toggle: false
+      state_color: true
+      entities:
+        - entity: cover.bucatarie_nord # butoane ↑ ■ ↓ automat
+          name: "Bucatarie Nord"
+        - entity: switch.activ_bucatarie_nord
+          name: "Include în automatizare"
+        - entity: number.pozitie_deschidere_bucatarie_nord
+          name: "Deschidere țintă (%)"
+        - type: attribute
+          entity: sensor.status_bucatarie_nord
+          attribute: stare_automatizare
+          name: "Stare automatizare"
+          icon: mdi:state-machine
+```
+
+> Înlocuiește `bucatarie_nord` cu sufixul real al entității tale cover. Entity ID-urile exacte
+> sunt rezolvate automat din registry la generare.
 
 ---
 
