@@ -84,6 +84,7 @@ class RollsMotorPowerNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_putere_motor"
+        self._attr_suggested_object_id = "rolls_putere_motor"
         self._attr_device_info = _device_info(entry)
         self._attr_native_value = DEFAULT_MOTOR_POWER
 
@@ -133,6 +134,7 @@ class RollsStabilizationDelayNumber(CoordinatorEntity, NumberEntity, RestoreEnti
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_timp_stabilizare"
+        self._attr_suggested_object_id = "rolls_timp_stabilizare"
         self._attr_device_info = _device_info(entry)
         self._attr_native_value = float(DEFAULT_STABILIZATION_DELAY)
 
@@ -189,6 +191,7 @@ class RollsCoverPositionNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         self._cover_entity_id = cover_entity_id
         slug = cover_entity_id.replace(".", "_").replace("-", "_")
         self._attr_unique_id = f"{entry.entry_id}_pozitie_{slug}"
+        self._attr_suggested_object_id = f"rolls_pozitie_{slug}"
         self._attr_name = f"Poziție deschidere — {cover_name}"
         self._attr_device_info = _device_info(entry)
         self._attr_native_value = float(DEFAULT_OPEN_POSITION)

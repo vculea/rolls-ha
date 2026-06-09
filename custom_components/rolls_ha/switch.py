@@ -74,6 +74,7 @@ class RollsAutoSwitch(CoordinatorEntity, SwitchEntity, RestoreEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_control_automat"
+        self._attr_suggested_object_id = "rolls_control_automat"
         self._attr_device_info = _device_info(entry)
         self._is_on = True
 
@@ -125,6 +126,7 @@ class RollsCoverActiveSwitch(CoordinatorEntity, SwitchEntity, RestoreEntity):
         self._cover_entity_id = cover_entity_id
         slug = cover_entity_id.replace(".", "_").replace("-", "_")
         self._attr_unique_id = f"{entry.entry_id}_activ_{slug}"
+        self._attr_suggested_object_id = f"rolls_activ_{slug}"
         self._attr_name = f"Activ — {cover_name}"
         self._attr_device_info = _device_info(entry)
         self._is_on = True
