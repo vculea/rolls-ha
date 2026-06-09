@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solar sensors",
+        "description": "Select the solar production sensor and the grid power sensor from your Shelly EM.",
+        "data": {
+          "solar_sensor": "Solar production sensor (W)",
+          "grid_sensor": "Grid power sensor (W)",
+          "grid_convention": "Grid sensor sign convention"
+        }
+      },
+      "covers": {
+        "title": "Select covers",
+        "description": "Select the cover (blind/shutter) entities to automate. **Order matters** — covers will be opened in the order shown.",
+        "data": {
+          "covers": "Cover entities (in activation order)"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Motor power is the surplus threshold needed to open one cover. Stabilization delay prevents actions during brief surplus fluctuations.",
+        "data": {
+          "motor_power": "Motor power / surplus threshold (W)",
+          "stabilization_delay": "Stabilization delay (s)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure",
+        "description": "Update sensors and cover list. Per-cover positions and active states are preserved for covers that remain in the list.",
+        "data": {
+          "solar_sensor": "Solar production sensor (W)",
+          "grid_sensor": "Grid power sensor (W)",
+          "grid_convention": "Grid sensor sign convention",
+          "covers": "Cover entities (in activation order)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Solar and grid sensors must be different entities.",
+      "no_covers": "You must select at least one cover entity."
+    },
+    "abort": {
+      "reconfigure_successful": "Reconfiguration successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "data": {
+          "motor_power": "Motor power / surplus threshold (W)",
+          "stabilization_delay": "Stabilization delay (s)",
+          "grid_convention_override": "Grid sensor sign convention (override)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "control_automat": {
+        "name": "Solar auto-control"
+      },
+      "activ_jaluzea": {
+        "name": "Active"
+      }
+    },
+    "number": {
+      "putere_motor": {
+        "name": "Motor power threshold"
+      },
+      "timp_stabilizare": {
+        "name": "Stabilization delay"
+      },
+      "pozitie_deschidere": {
+        "name": "Open position"
+      }
+    },
+    "sensor": {
+      "surplus_solar": {
+        "name": "Solar surplus"
+      },
+      "status_jaluzea": {
+        "name": "Status"
+      }
+    }
+  }
+}

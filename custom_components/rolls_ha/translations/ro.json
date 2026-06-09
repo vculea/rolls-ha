@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Senzori solar",
+        "description": "Selectează senzorul de producție solară și senzorul de putere rețea de la Shelly EM.",
+        "data": {
+          "solar_sensor": "Senzor producție solară (W)",
+          "grid_sensor": "Senzor putere rețea (W)",
+          "grid_convention": "Convenție semn senzor rețea"
+        }
+      },
+      "covers": {
+        "title": "Selectează jaluzelele",
+        "description": "Selectează entitățile cover (jaluzele/storuri) de automatizat. **Ordinea contează** — jaluzelele vor fi deschise în ordinea selectată.",
+        "data": {
+          "covers": "Entități jaluzele (în ordinea de activare)"
+        }
+      },
+      "settings": {
+        "title": "Setări",
+        "description": "Puterea motorului este pragul de surplus necesar pentru a deschide o jaluzea. Întârzierea de stabilizare previne acțiunile la fluctuații scurte.",
+        "data": {
+          "motor_power": "Putere motor / prag surplus (W)",
+          "stabilization_delay": "Timp stabilizare (s)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurare",
+        "description": "Modifică senzorii și lista de jaluzele. Pozițiile și stările per jaluzea sunt păstrate pentru jaluzelele care rămân în listă.",
+        "data": {
+          "solar_sensor": "Senzor producție solară (W)",
+          "grid_sensor": "Senzor putere rețea (W)",
+          "grid_convention": "Convenție semn senzor rețea",
+          "covers": "Entități jaluzele (în ordinea de activare)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Senzorul solar și senzorul de rețea trebuie să fie entități diferite.",
+      "no_covers": "Trebuie să selectezi cel puțin o jaluzea."
+    },
+    "abort": {
+      "reconfigure_successful": "Reconfigurare reușită."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Setări",
+        "data": {
+          "motor_power": "Putere motor / prag surplus (W)",
+          "stabilization_delay": "Timp stabilizare (s)",
+          "grid_convention_override": "Convenție semn senzor rețea (suprascrie)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "control_automat": {
+        "name": "Control automat solar"
+      },
+      "activ_jaluzea": {
+        "name": "Activ"
+      }
+    },
+    "number": {
+      "putere_motor": {
+        "name": "Prag putere motor"
+      },
+      "timp_stabilizare": {
+        "name": "Timp stabilizare"
+      },
+      "pozitie_deschidere": {
+        "name": "Poziție deschidere"
+      }
+    },
+    "sensor": {
+      "surplus_solar": {
+        "name": "Surplus solar"
+      },
+      "status_jaluzea": {
+        "name": "Status"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "domain": "rolls_ha",
+  "name": "Rolls Solar Controller",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/vculea/rolls-ha",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@vculea"],
+  "iot_class": "local_polling"
+}
