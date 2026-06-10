@@ -136,16 +136,16 @@ La fiecare serviciu apelat de coordinator se creează un `Context` propriu și s
 
 ### Tabel de decizii
 
-| Scenar | Surplus   | Stare jaluzea  | Activ | Rezultat                                     |
-| ------ | --------- | -------------- | ----- | -------------------------------------------- |
-| S1     | ≥ prag    | PENDING        | Da    | Deschidere imediată                          |
-| S2     | < prag    | PENDING        | Da    | Rămâne PENDING                               |
-| S3     | < prag    | OPENING        | Da    | stop_cover, revine la PENDING                |
-| S4     | ≥ prag    | AUTO_OPENED    | Da    | Sărită (deja deschisă)                       |
-| S5     | orice     | MANUAL         | Da    | Sărită (operare manuală)                     |
-| S6     | orice     | orice          | Nu    | Sărită (dezactivată)                         |
-| S7     | ≥ prag    | PENDING        | Da    | Alt motor în mișcare (OK surplus) — așteptare |
-| S8     | orice     | PENDING        | Da    | Deja la poziția țintă → AUTO_OPENED instant  |
+| Scenar | Surplus | Stare jaluzea | Activ | Rezultat                                      |
+| ------ | ------- | ------------- | ----- | --------------------------------------------- |
+| S1     | ≥ prag  | PENDING       | Da    | Deschidere imediată                           |
+| S2     | < prag  | PENDING       | Da    | Rămâne PENDING                                |
+| S3     | < prag  | OPENING       | Da    | stop_cover, revine la PENDING                 |
+| S4     | ≥ prag  | AUTO_OPENED   | Da    | Sărită (deja deschisă)                        |
+| S5     | orice   | MANUAL        | Da    | Sărită (operare manuală)                      |
+| S6     | orice   | orice         | Nu    | Sărită (dezactivată)                          |
+| S7     | ≥ prag  | PENDING       | Da    | Alt motor în mișcare (OK surplus) — așteptare |
+| S8     | orice   | PENDING       | Da    | Deja la poziția țintă → AUTO_OPENED instant   |
 
 ### Reset la miezul nopții
 
@@ -184,8 +184,8 @@ Atributele `sensor.status_<jaluzea>` sunt citite **live** din entitatea cover su
 
 ### Number-uri (ajustabile live)
 
-| Entitate                              | Domeniu   | Default | Descriere                                                   |
-| ------------------------------------- | --------- | ------- | ----------------------------------------------------------- |
+| Entitate                              | Domeniu   | Default | Descriere                                       |
+| ------------------------------------- | --------- | ------- | ----------------------------------------------- |
 | `number.prag_putere_motor`            | 10–5000 W | 150 W   | Surplusul minim necesar pentru a porni un motor |
 | `number.pozitie_deschidere_<jaluzea>` | 10–100 %  | 100 %   | La ce procent se deschide jaluzea respectivă    |
 
@@ -348,30 +348,30 @@ tests/
 
 ### Ce acoperă testele
 
-| Test                                             | Scenariu | Descriere                                             |
-| ------------------------------------------------ | -------- | ----------------------------------------------------- |
-| `test_s1_deschidere_la_surplus_suficient`        | S1       | Prima jaluzea PENDING se deschide când surplus ≥ prag |
-| `test_s1_pozitie_partiala`                       | S1b      | `set_cover_position` folosit când target < 100%       |
-| `test_s2_surplus_insuficient_nu_deschide`        | S2       | Surplus < prag → rămâne PENDING                       |
+| Test                                             | Scenariu | Descriere                                                    |
+| ------------------------------------------------ | -------- | ------------------------------------------------------------ |
+| `test_s1_deschidere_la_surplus_suficient`        | S1       | Prima jaluzea PENDING se deschide când surplus ≥ prag        |
+| `test_s1_pozitie_partiala`                       | S1b      | `set_cover_position` folosit când target < 100%              |
+| `test_s2_surplus_insuficient_nu_deschide`        | S2       | Surplus < prag → rămâne PENDING                              |
 | `test_s2_reset_timer_la_scadere_surplus`         | S2b      | Jaluzea în deschidere + surplus scade → stop_cover + PENDING |
 | `test_s3_asteapta_stabilizare`                   | S3       | Surplus suficient → deschidere imediată (fără delay)         |
 | `test_s3_actioneaza_dupa_stabilizare`            | S3b      | Surplus prezent → deschide (timer ignorat)                   |
-| `test_s4_ordine_deschidere`                      | S4       | Câte una pe rând, nu toate deodată                    |
-| `test_s4_sare_peste_auto_opened`                 | S4b      | AUTO_OPENED sărită, continuă cu PENDING               |
-| `test_s5_auto_off_nu_actioneaza`                 | S5       | Control global OFF → nicio acțiune                    |
-| `test_s6_cover_dezactivata_sarire`               | S6       | Jaluzea dezactivată sărită, continuă cu următoarea    |
-| `test_s7_manual_sarita`                          | S7       | MANUAL sărită în coadă                                |
-| `test_s8_toate_procesate_stop`                   | S8       | Toate AUTO_OPENED/MANUAL → nicio acțiune              |
-| `test_s9_conventie_retea_inversa`                | S9       | Surplus calculat corect cu semn inversat              |
-| `test_s10_surplus_virtual_motor_activ`           | S10      | Motor activ adaugă puterea înapoi la surplus          |
-| `test_m1_schimbare_manuala_markare`              | M1       | Schimbare fără context coordinator → MANUAL           |
-| `test_m2_schimbare_in_grace_period_ignorata`     | M2       | Schimbare în grace period → nu e MANUAL               |
-| `test_m3_schimbare_context_coordinator_ignorata` | M3       | Context match → ignorată                              |
-| `test_m4_auto_opened_devine_manual_la_inchidere` | M4       | AUTO_OPENED → MANUAL la închidere manuală             |
-| `test_r1_reset_midnight_pending`                 | R1       | Toate stările → PENDING la miezul nopții              |
-| `test_r2_reset_nu_atinge_dezactivate`            | R2       | Dezactivate nu sunt resetate                          |
-| `test_r3_reset_sterge_timer_stabilizare`         | R3       | Timer de stabilizare curățat la reset                 |
-| `test_r4_reset_sterge_opening_in_progress`       | R4       | Mișcări în curs și acțiuni curățate la reset          |
+| `test_s4_ordine_deschidere`                      | S4       | Câte una pe rând, nu toate deodată                           |
+| `test_s4_sare_peste_auto_opened`                 | S4b      | AUTO_OPENED sărită, continuă cu PENDING                      |
+| `test_s5_auto_off_nu_actioneaza`                 | S5       | Control global OFF → nicio acțiune                           |
+| `test_s6_cover_dezactivata_sarire`               | S6       | Jaluzea dezactivată sărită, continuă cu următoarea           |
+| `test_s7_manual_sarita`                          | S7       | MANUAL sărită în coadă                                       |
+| `test_s8_toate_procesate_stop`                   | S8       | Toate AUTO_OPENED/MANUAL → nicio acțiune                     |
+| `test_s9_conventie_retea_inversa`                | S9       | Surplus calculat corect cu semn inversat                     |
+| `test_s10_surplus_virtual_motor_activ`           | S10      | Motor activ adaugă puterea înapoi la surplus                 |
+| `test_m1_schimbare_manuala_markare`              | M1       | Schimbare fără context coordinator → MANUAL                  |
+| `test_m2_schimbare_in_grace_period_ignorata`     | M2       | Schimbare în grace period → nu e MANUAL                      |
+| `test_m3_schimbare_context_coordinator_ignorata` | M3       | Context match → ignorată                                     |
+| `test_m4_auto_opened_devine_manual_la_inchidere` | M4       | AUTO_OPENED → MANUAL la închidere manuală                    |
+| `test_r1_reset_midnight_pending`                 | R1       | Toate stările → PENDING la miezul nopții                     |
+| `test_r2_reset_nu_atinge_dezactivate`            | R2       | Dezactivate nu sunt resetate                                 |
+| `test_r3_reset_sterge_timer_stabilizare`         | R3       | Timer de stabilizare curățat la reset                        |
+| `test_r4_reset_sterge_opening_in_progress`       | R4       | Mișcări în curs și acțiuni curățate la reset                 |
 
 ---
 
