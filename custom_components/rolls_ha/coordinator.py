@@ -373,33 +373,41 @@ class RollsCoordinator(DataUpdateCoordinator):
             self._flush_cycle_log()
             return
 
-        # ── Găsim prima jaluzea PENDING ──────────────────────────────────
+        # ── Găsim prima jaluzea PENDING care chiar necesită deschidere ─────
+        # Jaluzele deja la poziția țintă sunt marcate AUTO_OPENED instant,
+        # fără a reseta timer-ul de stabilizare, și se trece imediat la urm.
         covers_list: list[str] = cfg.get(CONF_COVERS, [])
         next_pending_eid: str | None = None
-        for eid in covers_list:
-            active = rt.get(f"cover_active_{eid}", True)
-            if active and cover_states.get(eid) == COVER_STATE_PENDING:
-                next_pending_eid = eid
-                break
+        target_pos: int = DEFAULT_OPEN_POSITION
+        current_pos: int | None = None
 
-        if next_pending_eid is None:
-            self._clog("Nicio jaluzea PENDING — toate procesate sau dezactivate")
-            rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
-            self._flush_cycle_log()
-            return
+        while True:
+            candidate: str | None = None
+            for eid in covers_list:
+                active = rt.get(f"cover_active_{eid}", True)
+                if active and cover_states.get(eid) == COVER_STATE_PENDING:
+                    candidate = eid
+                    break
 
-        # ── Verificăm dacă jaluzea e deja la poziția țintă ───────────────
-        target_pos = rt.get(f"open_position_{next_pending_eid}", DEFAULT_OPEN_POSITION)
-        current_pos = self._cover_position(next_pending_eid)
-        if current_pos is not None and current_pos >= target_pos - 2:
-            cover_states[next_pending_eid] = COVER_STATE_AUTO_OPENED
-            self._log_action(
-                f"Jaluzea {next_pending_eid}: deja la {current_pos}% "
-                f"(țintă {target_pos}%) — marcată ca deschisă automat"
-            )
-            rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
-            self._flush_cycle_log()
-            return
+            if candidate is None:
+                self._clog("Nicio jaluzea PENDING — toate procesate sau dezactivate")
+                rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
+                self._flush_cycle_log()
+                return
+
+            target_pos = rt.get(f"open_position_{candidate}", DEFAULT_OPEN_POSITION)
+            current_pos = self._cover_position(candidate)
+            if current_pos is not None and current_pos >= target_pos - 2:
+                cover_states[candidate] = COVER_STATE_AUTO_OPENED
+                self._log_action(
+                    f"Jaluzea {candidate}: deja la {current_pos}% "
+                    f"(țintă {target_pos}%) — marcată ca deschisă automat, trec la urm."
+                )
+                # Nu resetăm timer-ul; trecem imediat la urm. jaluzea din coadă
+                continue
+
+            next_pending_eid = candidate
+            break
 
         # ── Stabilitate surplus ──────────────────────────────────────────
         if virtual_surplus >= motor_power:
