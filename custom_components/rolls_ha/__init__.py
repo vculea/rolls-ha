@@ -133,6 +133,7 @@ async def _generate_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> None:
     sn_surplus = find("sensor", "surplus_solar")
     nb_motor = find("number", "putere_motor")
     nb_delay = find("number", "timp_stabilizare")
+    btn_reset = find("button", "reset_stare")
 
     # ── Secțiuni per jaluzea ────────────────────────────────────────────────
     cover_blocks: list[str] = []
@@ -248,6 +249,9 @@ async def _generate_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> None:
         f"      - entity: {nb_delay}\n"
         f"        name: \"Stabilizare (s)\"\n"
         f"        icon: mdi:timer-outline\n"
+        f"      - entity: {btn_reset}\n"
+        f"        name: \"Resetare stare automatizare\"\n"
+        f"        icon: mdi:restart\n"
         f"\n"
         f"  # ════════════════════════════════════════════════════════════════════\n"
         f"  # JALUZELE ({len(covers_list)} configurate) — fiecare grupat în vertical-stack\n"

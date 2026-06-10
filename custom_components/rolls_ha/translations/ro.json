@@ -57,6 +57,11 @@
     }
   },
   "entity": {
+    "button": {
+      "reset_stare": {
+        "name": "Resetare stare automatizare"
+      }
+    },
     "switch": {
       "control_automat": {
         "name": "Control automat solar"

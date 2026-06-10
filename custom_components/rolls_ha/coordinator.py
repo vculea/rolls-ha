@@ -188,6 +188,10 @@ class RollsCoordinator(DataUpdateCoordinator):
         )
         self._unsub_listeners.append(unsub)
 
+    def reset_states(self) -> None:
+        """Reset manual al stărilor (apelabil din button entity)."""
+        self._do_midnight_reset()
+
     def _do_midnight_reset(self) -> None:
         """Resetează stările la PENDING (exceptând dezactivate)."""
         rt = self._runtime()

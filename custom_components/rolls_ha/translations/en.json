@@ -57,6 +57,11 @@
     }
   },
   "entity": {
+    "button": {
+      "reset_stare": {
+        "name": "Reset automation state"
+      }
+    },
     "switch": {
       "control_automat": {
         "name": "Solar auto-control"

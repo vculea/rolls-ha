@@ -34,7 +34,7 @@ DEFAULT_OPEN_POSITION = 100         # % — fully open
 OPENING_TIMEOUT = 120               # seconds — max wait for cover to finish moving
 
 # ── Platforms ─────────────────────────────────────────────────────────────────────
-PLATFORMS = ["switch", "number", "sensor"]
+PLATFORMS = ["button", "switch", "number", "sensor"]
 
 # ── Status strings (used by sensor entities) ──────────────────────────────────────
 STATUS_WAITING_SURPLUS = "Așteptare surplus"
