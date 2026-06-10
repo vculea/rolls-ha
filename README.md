@@ -112,15 +112,17 @@ O jaluzea cu `switch.activ_<jaluzea> = OFF` este sărită din coadă
 
 ```
 1. Calculează surplus_virtual
-2. Dacă vreun motor e în mișcare — așteaptă finalizarea lui
-3. Găsește prima jaluzea PENDING și activă din coadă
-4. Dacă jaluzea e deja la poziția țintă — marchează AUTO_OPENED, continuă
-5. Dacă surplus_virtual ≥ motor_power timp de stabilization_delay secunde:
+2. Dacă surplus_virtual < motor_power și un motor e în mișcare:
+      → trimite stop_cover, jaluzea revine la PENDING
+      → la revenirea surplusului jaluzea va fi redeschisă
+3. Dacă vreun motor e în mișcare și surplus e OK — așteaptă finalizarea lui
+4. Parcurge coada PENDING; jaluzele deja la poziția țintă sunt marcate
+   AUTO_OPENED instant și se sare la urm. fără a aștepta ciclul următor
+5. Dacă surplus_virtual ≥ motor_power:
       → trimite cover.open_cover (sau set_cover_position dacă poziție < 100%)
-      → jaluzea devine OPENING
-      → când mișcarea se termină → AUTO_OPENED
+      → jaluzea devine OPENING; la finalizare → AUTO_OPENED
       → continuă evaluarea pentru jaluzea următoare
-6. Dacă surplus scade sub prag — timer de stabilizare se resetează
+6. Dacă surplus_virtual < motor_power — rămâne PENDING, reîncearcă la ciclul următor
 ```
 
 ### Detectarea operării manuale
@@ -134,16 +136,16 @@ La fiecare serviciu apelat de coordinator se creează un `Context` propriu și s
 
 ### Tabel de decizii
 
-| Scenar | Surplus          | Stare jaluzea | Activ | Rezultat                            |
-| ------ | ---------------- | ------------- | ----- | ----------------------------------- |
-| S1     | ≥ prag, stabil   | PENDING       | Da    | Deschidere automată                 |
-| S2     | < prag           | PENDING       | Da    | Rămâne PENDING                      |
-| S3     | ≥ prag, instabil | PENDING       | Da    | Așteptare timer                     |
-| S4     | ≥ prag, stabil   | AUTO_OPENED   | Da    | Sărită (deja deschisă)              |
-| S5     | orice            | MANUAL        | Da    | Sărită (operare manuală)            |
-| S6     | orice            | orice         | Nu    | Sărită (dezactivată)                |
-| S7     | ≥ prag, stabil   | PENDING       | Da    | Alt motor în mișcare — așteptare    |
-| S8     | orice            | PENDING       | Da    | Deja la poziția țintă → AUTO_OPENED |
+| Scenar | Surplus   | Stare jaluzea  | Activ | Rezultat                                     |
+| ------ | --------- | -------------- | ----- | -------------------------------------------- |
+| S1     | ≥ prag    | PENDING        | Da    | Deschidere imediată                          |
+| S2     | < prag    | PENDING        | Da    | Rămâne PENDING                               |
+| S3     | < prag    | OPENING        | Da    | stop_cover, revine la PENDING                |
+| S4     | ≥ prag    | AUTO_OPENED    | Da    | Sărită (deja deschisă)                       |
+| S5     | orice     | MANUAL         | Da    | Sărită (operare manuală)                     |
+| S6     | orice     | orice          | Nu    | Sărită (dezactivată)                         |
+| S7     | ≥ prag    | PENDING        | Da    | Alt motor în mișcare (OK surplus) — așteptare |
+| S8     | orice     | PENDING        | Da    | Deja la poziția țintă → AUTO_OPENED instant  |
 
 ### Reset la miezul nopții
 
@@ -184,9 +186,8 @@ Atributele `sensor.status_<jaluzea>` sunt citite **live** din entitatea cover su
 
 | Entitate                              | Domeniu   | Default | Descriere                                                   |
 | ------------------------------------- | --------- | ------- | ----------------------------------------------------------- |
-| `number.prag_putere_motor`            | 10–5000 W | 150 W   | Surplusul minim necesar pentru a porni un motor             |
-| `number.timp_stabilizare`             | 0–300 s   | 10 s    | Cât timp surplusul trebuie să fie stabil înainte de acțiune |
-| `number.pozitie_deschidere_<jaluzea>` | 10–100 %  | 100 %   | La ce procent se deschide jaluzea respectivă                |
+| `number.prag_putere_motor`            | 10–5000 W | 150 W   | Surplusul minim necesar pentru a porni un motor |
+| `number.pozitie_deschidere_<jaluzea>` | 10–100 %  | 100 %   | La ce procent se deschide jaluzea respectivă    |
 
 ---
 
@@ -290,10 +291,9 @@ Ordinea poate fi schimbată oricând din **Reconfigure**.
 
 ### Step 3 — Setări
 
-| Câmp             | Default | Descriere                                                        |
-| ---------------- | ------- | ---------------------------------------------------------------- |
-| Putere motor     | 150 W   | Surplusul minim necesar; de obicei consumul motorului în mișcare |
-| Timp stabilizare | 10 s    | Evită acțiuni la fluctuații scurte de producție                  |
+| Câmp         | Default | Descriere                                                        |
+| ------------ | ------- | ---------------------------------------------------------------- |
+| Putere motor | 150 W   | Surplusul minim necesar; de obicei consumul motorului în mișcare |
 
 ---
 
@@ -305,7 +305,6 @@ sau din **Configure** (options flow) fără restart:
 | Setare                         | Default | Descriere                                                              |
 | ------------------------------ | ------- | ---------------------------------------------------------------------- |
 | Prag putere motor              | 150 W   | Schimbă pragul global (ex. 200 W dacă motoarele tale consumă mai mult) |
-| Timp stabilizare               | 10 s    | Mărește dacă producția fluctuează des (nori, umbră parțială)           |
 | Poziție deschidere per jaluzea | 100 %   | Deschide la 80% pentru intimitate, 100% pentru lumină maximă           |
 
 ### Adăugare jaluzele noi
@@ -354,9 +353,9 @@ tests/
 | `test_s1_deschidere_la_surplus_suficient`        | S1       | Prima jaluzea PENDING se deschide când surplus ≥ prag |
 | `test_s1_pozitie_partiala`                       | S1b      | `set_cover_position` folosit când target < 100%       |
 | `test_s2_surplus_insuficient_nu_deschide`        | S2       | Surplus < prag → rămâne PENDING                       |
-| `test_s2_reset_timer_la_scadere_surplus`         | S2b      | Timer de stabilizare resetat la scădere surplus       |
-| `test_s3_asteapta_stabilizare`                   | S3       | Timer pornit, delay neexpirat → nu acționează         |
-| `test_s3_actioneaza_dupa_stabilizare`            | S3b      | Timer expirat → deschide                              |
+| `test_s2_reset_timer_la_scadere_surplus`         | S2b      | Jaluzea în deschidere + surplus scade → stop_cover + PENDING |
+| `test_s3_asteapta_stabilizare`                   | S3       | Surplus suficient → deschidere imediată (fără delay)         |
+| `test_s3_actioneaza_dupa_stabilizare`            | S3b      | Surplus prezent → deschide (timer ignorat)                   |
 | `test_s4_ordine_deschidere`                      | S4       | Câte una pe rând, nu toate deodată                    |
 | `test_s4_sare_peste_auto_opened`                 | S4b      | AUTO_OPENED sărită, continuă cu PENDING               |
 | `test_s5_auto_off_nu_actioneaza`                 | S5       | Control global OFF → nicio acțiune                    |
