@@ -41,7 +41,6 @@ from .const import (
     CONF_GRID_POSITIVE_IS_EXPORT,
     CONF_COVERS,
     CONF_MOTOR_POWER,
-    CONF_STABILIZATION_DELAY,
     RUNTIME_AUTO_ENABLED,
     RUNTIME_COVER_STATES,
     RUNTIME_SURPLUS_STABLE_SINCE,
@@ -50,7 +49,6 @@ from .const import (
     COVER_STATE_AUTO_OPENED,
     COVER_STATE_MANUAL,
     DEFAULT_MOTOR_POWER,
-    DEFAULT_STABILIZATION_DELAY,
     DEFAULT_OPEN_POSITION,
     OPENING_TIMEOUT,
     STATUS_WAITING_SURPLUS,
@@ -299,9 +297,6 @@ class RollsCoordinator(DataUpdateCoordinator):
 
         auto_enabled: bool = rt.get(RUNTIME_AUTO_ENABLED, True)
         motor_power: float = rt.get(CONF_MOTOR_POWER, DEFAULT_MOTOR_POWER)
-        stabilization_delay: int = rt.get(
-            CONF_STABILIZATION_DELAY, DEFAULT_STABILIZATION_DELAY
-        )
         cover_states: dict = rt.get(RUNTIME_COVER_STATES, {})
 
         # ── Citire senzori ───────────────────────────────────────────────
@@ -357,7 +352,19 @@ class RollsCoordinator(DataUpdateCoordinator):
         # ── Control dezactivat ───────────────────────────────────────────
         if not auto_enabled:
             self._clog("Control automat dezactivat — skip")
-            rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
+            self._flush_cycle_log()
+            return
+
+        # ── Întrerupem deschiderea dacă surplusul a scăzut sub prag ──────
+        if self._opening_in_progress and virtual_surplus < motor_power:
+            for eid in list(self._opening_in_progress.keys()):
+                cover_states[eid] = COVER_STATE_PENDING
+                await self._stop_cover(eid)
+                self._opening_in_progress.pop(eid)
+            self._log_action(
+                f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
+                f"— jaluzea oprită, revine la PENDING"
+            )
             self._flush_cycle_log()
             return
 
@@ -391,7 +398,6 @@ class RollsCoordinator(DataUpdateCoordinator):
 
             if candidate is None:
                 self._clog("Nicio jaluzea PENDING — toate procesate sau dezactivate")
-                rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
                 self._flush_cycle_log()
                 return
 
@@ -409,33 +415,18 @@ class RollsCoordinator(DataUpdateCoordinator):
             next_pending_eid = candidate
             break
 
-        # ── Stabilitate surplus ──────────────────────────────────────────
+        # ── Deschidere imediată când surplusul e suficient ───────────────
         if virtual_surplus >= motor_power:
-            # Pornește timer-ul dacă nu e deja activ
-            if rt.get(RUNTIME_SURPLUS_STABLE_SINCE) is None:
-                rt[RUNTIME_SURPLUS_STABLE_SINCE] = datetime.now()
-
-            elapsed_stable = (
-                datetime.now() - rt[RUNTIME_SURPLUS_STABLE_SINCE]
-            ).total_seconds()
             self._clog(
                 f"Surplus {virtual_surplus:.0f}W ≥ prag {motor_power:.0f}W "
-                f"— stabil {elapsed_stable:.0f}s / {stabilization_delay}s "
-                f"— urmează: {next_pending_eid}"
+                f"— deschid {next_pending_eid}"
             )
-
-            if elapsed_stable >= stabilization_delay:
-                await self._open_cover(
-                    next_pending_eid, target_pos, rt, cover_states
-                )
-                rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
+            await self._open_cover(next_pending_eid, target_pos, rt, cover_states)
         else:
-            if rt.get(RUNTIME_SURPLUS_STABLE_SINCE) is not None:
-                self._clog(
-                    f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
-                    f"— reset timer stabilizare"
-                )
-            rt[RUNTIME_SURPLUS_STABLE_SINCE] = None
+            self._clog(
+                f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
+                f"— așteptare surplus"
+            )
 
         self._flush_cycle_log()
 
@@ -480,6 +471,23 @@ class RollsCoordinator(DataUpdateCoordinator):
         self._log_action(
             f"Deschidere {entity_id} la {target_position}% — surplus suficient"
         )
+
+    async def _stop_cover(self, entity_id: str) -> None:
+        """Trimite stop_cover și înregistrează acțiunea (evită detecție manuală)."""
+        ctx = Context()
+        self._coordinator_actions[entity_id] = {
+            "time": datetime.now(),
+            "context_id": ctx.id,
+            "target_position": 0,
+        }
+        await self.hass.services.async_call(
+            "cover",
+            "stop_cover",
+            {"entity_id": entity_id},
+            context=ctx,
+            blocking=False,
+        )
+        self._log_action(f"Jaluzea {entity_id}: oprită (surplus insuficient)")
 
     def _flush_cycle_log(self) -> None:
         """Salvează buffer-ul ciclului curent în cycle_log (fără duplicate)."""

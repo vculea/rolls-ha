@@ -175,37 +175,44 @@ async def test_s2_surplus_insuficient_nu_deschide():
 
 @pytest.mark.asyncio
 async def test_s2_reset_timer_la_scadere_surplus():
-    """S2b: timer-ul de stabilizare se resetează când surplusul scade sub prag."""
+    """S2b: jaluzea în curs de deschidere + surplus scade sub prag → stop_cover + PENDING."""
     covers = ["cover.j1"]
-    entry = _make_entry(covers=covers, motor_power=150.0, stabilization_delay=30)
-    rt = _make_runtime(covers)
-    rt[RUNTIME_SURPLUS_STABLE_SINCE] = datetime.now() - timedelta(seconds=10)
-    hass = _make_hass(solar_w=200, grid_w=50)  # surplus = 50W < 150W
+    entry = _make_entry(covers=covers, motor_power=150.0)
+    rt = _make_runtime(covers, cover_states={"cover.j1": COVER_STATE_OPENING})
+    # grid importă 50W — virtual_surplus = -50 + 150 (motor activ) = 100W < 150W prag
+    hass = _make_hass(
+        solar_w=100, grid_w=-50,
+        cover_states={"cover.j1": (30, "opening")},
+    )
     coord = _build_coordinator(hass, entry, rt)
+    coord._opening_in_progress["cover.j1"] = {
+        "started": datetime.now() - timedelta(seconds=3),
+        "target_position": 100,
+    }
 
     await coord._apply_control_logic()
 
-    assert rt[RUNTIME_SURPLUS_STABLE_SINCE] is None
-    hass.services.async_call.assert_not_called()
+    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_PENDING
+    assert "cover.j1" not in coord._opening_in_progress
+    calls = hass.services.async_call.call_args_list
+    assert any(c[0][1] == "stop_cover" for c in calls)
 
 
 # ── S3: Stabilizare ───────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_s3_asteapta_stabilizare():
-    """S3: surplus suficient, dar timer-ul nu a expirat → nu acționează."""
+    """S3: surplus suficient → deschide imediat, fără delay de stabilizare."""
     covers = ["cover.j1"]
-    entry = _make_entry(covers=covers, motor_power=150.0, stabilization_delay=10)
-    rt = _make_runtime(covers, stabilization_delay=10)
-    # Timer pornit acum 5 secunde (< 10s)
-    rt[RUNTIME_SURPLUS_STABLE_SINCE] = datetime.now() - timedelta(seconds=5)
-    hass = _make_hass(solar_w=1000, grid_w=300)  # surplus = 300W
+    entry = _make_entry(covers=covers, motor_power=150.0)
+    rt = _make_runtime(covers)
+    hass = _make_hass(solar_w=1000, grid_w=300)  # surplus = 300W ≥ 150W prag
     coord = _build_coordinator(hass, entry, rt)
 
     await coord._apply_control_logic()
 
-    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_PENDING
-    hass.services.async_call.assert_not_called()
+    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
+    hass.services.async_call.assert_called_once()
 
 
 @pytest.mark.asyncio
