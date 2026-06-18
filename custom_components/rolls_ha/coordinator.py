@@ -139,6 +139,13 @@ class RollsCoordinator(DataUpdateCoordinator):
             if new_state is None or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 return
 
+            # Dacă jaluzea e în curs de deschidere comandată de coordinator
+            # (ex: a ajuns la capătul fizic de cursă și s-a oprit singură),
+            # triggherăm un refresh imediat pentru a marca AUTO_OPENED fără întârziere
+            if entity_id in self._opening_in_progress:
+                self.hass.async_create_task(self.async_refresh())
+                return
+
             # Verifică dacă schimbarea a fost inițiată de coordinator
             action = self._coordinator_actions.get(entity_id)
             if action:
@@ -146,23 +153,17 @@ class RollsCoordinator(DataUpdateCoordinator):
                 evt_ctx = event.context
                 coordinator_ctx_id = action.get("context_id")
 
-                # Potrivire context (cel mai precis) SAU grație de timp
-                if elapsed < _COORDINATOR_GRACE_SECONDS:
-                    if coordinator_ctx_id is not None and evt_ctx is not None:
-                        if (
-                            evt_ctx.id == coordinator_ctx_id
-                            or evt_ctx.parent_id == coordinator_ctx_id
-                        ):
-                            return  # schimbare inițiată de coordinator
-                    else:
-                        return  # în grace period, presupunem coordinator
+                # Potrivire context → schimbare inițiată de coordinator
+                if coordinator_ctx_id is not None and evt_ctx is not None:
+                    if (
+                        evt_ctx.id == coordinator_ctx_id
+                        or evt_ctx.parent_id == coordinator_ctx_id
+                    ):
+                        return  # schimbare inițiată de coordinator
 
-            # Dacă jaluzea e în curs de deschidere comandată de coordinator
-            # (ex: a ajuns la capătul fizic de cursă și s-a oprit singură),
-            # triggherăm un refresh imediat pentru a marca AUTO_OPENED fără întârziere
-            if entity_id in self._opening_in_progress:
-                self.hass.async_create_task(self.async_refresh())
-                return
+                # Grace period → motor poate fi încă în mișcare, ignorăm
+                if elapsed < _COORDINATOR_GRACE_SECONDS:
+                    return
 
             # Schimbare manuală
             rt = self._runtime()

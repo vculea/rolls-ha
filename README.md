@@ -343,7 +343,7 @@ python -m pytest tests/ -v
 tests/
   conftest.py                 — stub-uri pentru modulele homeassistant
   test_control_logic.py       — logica de control (S1–S10)
-  test_manual_and_reset.py    — detectare manuală (M1–M4) + reset zilnic (R1–R4)
+  test_manual_and_reset.py    — detectare manuală (M1–M5) + reset zilnic (R1–R4)
 ```
 
 ### Ce acoperă testele
@@ -368,6 +368,7 @@ tests/
 | `test_m2_schimbare_in_grace_period_ignorata`     | M2       | Schimbare în grace period → nu e MANUAL                      |
 | `test_m3_schimbare_context_coordinator_ignorata` | M3       | Context match → ignorată                                     |
 | `test_m4_auto_opened_devine_manual_la_inchidere` | M4       | AUTO_OPENED → MANUAL la închidere manuală                    |
+| `test_m5_capatul_de_cursa_nu_e_manual`           | M5       | Capăt de cursă fizic (context Shelly) nu e detectat ca manual |
 | `test_r1_reset_midnight_pending`                 | R1       | Toate stările → PENDING la miezul nopții                     |
 | `test_r2_reset_nu_atinge_dezactivate`            | R2       | Dezactivate nu sunt resetate                                 |
 | `test_r3_reset_sterge_timer_stabilizare`         | R3       | Timer de stabilizare curățat la reset                        |
