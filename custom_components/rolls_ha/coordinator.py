@@ -157,6 +157,12 @@ class RollsCoordinator(DataUpdateCoordinator):
                     else:
                         return  # în grace period, presupunem coordinator
 
+            # Dacă jaluzea e în curs de deschidere comandată de coordinator
+            # (ex: a ajuns la capătul fizic de cursă și s-a oprit singură),
+            # ignorăm — polling-ul va marca AUTO_OPENED la momentul potrivit
+            if entity_id in self._opening_in_progress:
+                return
+
             # Schimbare manuală
             rt = self._runtime()
             cover_states: dict = rt.get(RUNTIME_COVER_STATES, {})

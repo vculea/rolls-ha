@@ -199,6 +199,44 @@ def test_m4_auto_opened_devine_manual_la_inchidere():
     assert cover_states["cover.j1"] == COVER_STATE_MANUAL
 
 
+def test_m5_capatul_de_cursa_nu_e_manual():
+    """M5: jaluzea ajunge la capătul fizic de cursă (context diferit de coordinator)
+    în timp ce e în opening_in_progress → nu trebuie marcată MANUAL."""
+    from homeassistant.helpers.event import async_track_state_change_event
+
+    covers = ["cover.j1"]
+    entry = _make_entry(covers=covers)
+    rt = _make_runtime(covers, cover_states={"cover.j1": COVER_STATE_OPENING})
+    hass = MagicMock()
+    hass.data = {DOMAIN: {entry.entry_id: rt}}
+    hass.async_create_task = MagicMock()
+    coord = _build_coordinator(hass, entry, rt)
+
+    # Capturăm handler-ul real înregistrat de _subscribe_covers
+    async_track_state_change_event.reset_mock()
+    coord._subscribe_covers()
+    handler = async_track_state_change_event.call_args[0][2]
+
+    # Coordinator a trimis comanda de deschidere
+    coord._coordinator_actions["cover.j1"] = {
+        "time": datetime.now() - timedelta(seconds=10),
+        "context_id": "coord_ctx_123",
+        "target_position": 100,
+    }
+    coord._opening_in_progress["cover.j1"] = {
+        "started": datetime.now() - timedelta(seconds=10),
+        "target_position": 100,
+    }
+
+    # Jaluzea ajunge la capătul de cursă → HA emite event cu context nou (nu cel al coordinator-ului)
+    event = _make_event("cover.j1", "open", context_id="hardware_stop_different_ctx")
+    handler(event)
+
+    # Trebuie să rămână OPENING (nu MANUAL) — polling-ul va marca AUTO_OPENED
+    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
+    hass.async_create_task.assert_not_called()
+
+
 # ── Reset zilnic la miezul nopții ─────────────────────────────────────────────
 
 def test_r1_reset_midnight_pending():
