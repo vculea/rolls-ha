@@ -159,8 +159,9 @@ class RollsCoordinator(DataUpdateCoordinator):
 
             # Dacă jaluzea e în curs de deschidere comandată de coordinator
             # (ex: a ajuns la capătul fizic de cursă și s-a oprit singură),
-            # ignorăm — polling-ul va marca AUTO_OPENED la momentul potrivit
+            # triggherăm un refresh imediat pentru a marca AUTO_OPENED fără întârziere
             if entity_id in self._opening_in_progress:
+                self.hass.async_create_task(self.async_refresh())
                 return
 
             # Schimbare manuală

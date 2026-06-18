@@ -232,9 +232,10 @@ def test_m5_capatul_de_cursa_nu_e_manual():
     event = _make_event("cover.j1", "open", context_id="hardware_stop_different_ctx")
     handler(event)
 
-    # Trebuie să rămână OPENING (nu MANUAL) — polling-ul va marca AUTO_OPENED
+    # Trebuie să rămână OPENING (nu MANUAL)
     assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
-    hass.async_create_task.assert_not_called()
+    # Refresh imediat declanșat pentru a marca AUTO_OPENED fără întârziere
+    hass.async_create_task.assert_called_once()
 
 
 # ── Reset zilnic la miezul nopții ─────────────────────────────────────────────
