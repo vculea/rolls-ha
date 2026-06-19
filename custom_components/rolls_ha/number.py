@@ -28,6 +28,7 @@ from .const import (
     DEFAULT_OPEN_POSITION,
     RUNTIME_COVER_STATES,
     COVER_STATE_AUTO_OPENED,
+    COVER_STATE_MANUAL,
     COVER_STATE_PENDING,
 )
 from .coordinator import RollsCoordinator
@@ -230,7 +231,7 @@ class RollsCoverPositionNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
 
         cover_states: dict = rt.get(RUNTIME_COVER_STATES, {})
         eid = self._cover_entity_id
-        if cover_states.get(eid) == COVER_STATE_AUTO_OPENED:
+        if cover_states.get(eid) in (COVER_STATE_AUTO_OPENED, COVER_STATE_MANUAL):
             current_pos = self.coordinator._cover_position(eid)
             if current_pos is None or new_pos > current_pos + 2:
                 # Poziție mai mare — resetăm la PENDING, coordinator-ul
