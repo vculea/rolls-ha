@@ -25,6 +25,9 @@ from .const import (
     DEFAULT_MOTOR_POWER,
     DEFAULT_STABILIZATION_DELAY,
     DEFAULT_OPEN_POSITION,
+    RUNTIME_COVER_STATES,
+    COVER_STATE_AUTO_OPENED,
+    COVER_STATE_PENDING,
 )
 from .coordinator import RollsCoordinator
 
@@ -220,7 +223,20 @@ class RollsCoverPositionNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         self._attr_native_value = value
-        self._runtime()[f"open_position_{self._cover_entity_id}"] = int(value)
+        new_pos = int(value)
+        rt = self._runtime()
+        rt[f"open_position_{self._cover_entity_id}"] = new_pos
+
+        # Dacă jaluzea e deja AUTO_OPENED dar la o poziție mai mică decât
+        # noua țintă, o resetăm la PENDING pentru ca coordinator-ul să o
+        # poată redeschide la noul procent.
+        cover_states: dict = rt.get(RUNTIME_COVER_STATES, {})
+        eid = self._cover_entity_id
+        if cover_states.get(eid) == COVER_STATE_AUTO_OPENED:
+            current_pos = self.coordinator._cover_position(eid)
+            if current_pos is None or new_pos > current_pos + 2:
+                cover_states[eid] = COVER_STATE_PENDING
+
         self.async_write_ha_state()
 
     def _runtime(self) -> dict:
