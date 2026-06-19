@@ -7,11 +7,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -227,15 +228,36 @@ class RollsCoverPositionNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         rt = self._runtime()
         rt[f"open_position_{self._cover_entity_id}"] = new_pos
 
-        # Dacă jaluzea e deja AUTO_OPENED dar la o poziție mai mică decât
-        # noua țintă, o resetăm la PENDING pentru ca coordinator-ul să o
-        # poată redeschide la noul procent.
         cover_states: dict = rt.get(RUNTIME_COVER_STATES, {})
         eid = self._cover_entity_id
         if cover_states.get(eid) == COVER_STATE_AUTO_OPENED:
             current_pos = self.coordinator._cover_position(eid)
             if current_pos is None or new_pos > current_pos + 2:
+                # Poziție mai mare — resetăm la PENDING, coordinator-ul
+                # o va redeschide la noul procent când există surplus.
                 cover_states[eid] = COVER_STATE_PENDING
+            elif current_pos is not None and new_pos < current_pos - 2:
+                # Poziție mai mică — închidem imediat la noua țintă,
+                # fără a aștepta coordinator-ul (care nu trimite comenzi de
+                # închidere parțială). Înregistrăm acțiunea în coordinator
+                # pentru a evita detecția falsă ca operare manuală.
+                ctx = Context()
+                self.coordinator._coordinator_actions[eid] = {
+                    "time": datetime.now(),
+                    "context_id": ctx.id,
+                    "target_position": new_pos,
+                }
+                await self.hass.services.async_call(
+                    "cover",
+                    "set_cover_position",
+                    {"entity_id": eid, "position": new_pos},
+                    context=ctx,
+                    blocking=False,
+                )
+                _LOGGER.info(
+                    "Jaluzea %s: poziție redusă la %d%% (comandă imediată)",
+                    eid, new_pos,
+                )
 
         self.async_write_ha_state()
 
