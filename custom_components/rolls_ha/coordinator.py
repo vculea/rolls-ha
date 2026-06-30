@@ -93,6 +93,9 @@ class RollsCoordinator(DataUpdateCoordinator):
         # entity_id → {"started": datetime, "target_position": int}
         self._opening_in_progress: dict[str, dict] = {}
 
+        # Ignorăm detecția manuală în primele secunde după pornire (HA restaurează stările)
+        self._startup_complete: bool = False
+
     # ------------------------------------------------------------------
     # Setup / teardown
     # ------------------------------------------------------------------
@@ -103,6 +106,14 @@ class RollsCoordinator(DataUpdateCoordinator):
         self._subscribe_sensors()
         self._subscribe_covers()
         self._subscribe_midnight_reset()
+
+        @callback
+        def _mark_startup_complete(_now) -> None:  # noqa: ANN001
+            self._startup_complete = True
+            _LOGGER.debug("Startup grace period expirat — detecție manuală activată")
+
+        unsub = async_call_later(self.hass, 30, _mark_startup_complete)
+        self._unsub_listeners.append(unsub)
 
     def _subscribe_sensors(self) -> None:
         """Refresh reactiv când senzorii solar / rețea se schimbă."""
@@ -164,6 +175,10 @@ class RollsCoordinator(DataUpdateCoordinator):
                 # Grace period → motor poate fi încă în mișcare, ignorăm
                 if elapsed < _COORDINATOR_GRACE_SECONDS:
                     return
+
+            # Ignorăm schimbările din perioada de startup (HA restaurează entitățile)
+            if not self._startup_complete:
+                return
 
             # Schimbare manuală
             rt = self._runtime()
