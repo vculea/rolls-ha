@@ -378,6 +378,10 @@ tests/
 
 ## Release
 
+Pentru pregătirea unui release nou, folosește skill-ul
+`.github/skills/rolls-ha-release/SKILL.md`. Acesta verifică modificările locale,
+rulează testele, actualizează versiunea și generează sumarul pentru GitHub Release.
+
 ### Pași pentru publicarea unui release nou
 
 1. Actualizează versiunea în `custom_components/rolls_ha/manifest.json`:

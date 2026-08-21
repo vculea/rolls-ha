@@ -158,6 +158,7 @@ class RollsCoordinator(DataUpdateCoordinator):
                 return
 
             # Verifică dacă schimbarea a fost inițiată de coordinator
+            reason = "fără acțiune coordinator înregistrată"
             action = self._coordinator_actions.get(entity_id)
             if action:
                 elapsed = (datetime.now() - action["time"]).total_seconds()
@@ -176,6 +177,13 @@ class RollsCoordinator(DataUpdateCoordinator):
                 if elapsed < _COORDINATOR_GRACE_SECONDS:
                     return
 
+                reason = (
+                    f"context nepotrivit (evt={evt_ctx.id if evt_ctx else None}, "
+                    f"parent={evt_ctx.parent_id if evt_ctx else None}, "
+                    f"coordonator={coordinator_ctx_id}) și grace period expirat "
+                    f"({elapsed:.0f}s ≥ {_COORDINATOR_GRACE_SECONDS}s)"
+                )
+
             # Ignorăm schimbările din perioada de startup (HA restaurează entitățile)
             if not self._startup_complete:
                 return
@@ -189,8 +197,17 @@ class RollsCoordinator(DataUpdateCoordinator):
                 cover_states[entity_id] = COVER_STATE_MANUAL
                 self._coordinator_actions.pop(entity_id, None)
                 self._opening_in_progress.pop(entity_id, None)
-                self._log_action(
-                    f"Jaluzea {entity_id}: operare manuală detectată → ignorată azi"
+                old_state = event.data.get("old_state")
+                evt_ctx = event.context
+                self._log_manual_detected(
+                    f"Jaluzea {entity_id}: operare manuală detectată (stare anterioară "
+                    f"{current}) → ignorată azi | motiv: {reason} | "
+                    f"stare: {old_state.state if old_state else '?'}→{new_state.state} "
+                    f"(poz {old_state.attributes.get('current_position') if old_state else '?'}"
+                    f"→{new_state.attributes.get('current_position')}) | "
+                    f"context eveniment: id={evt_ctx.id if evt_ctx else None}, "
+                    f"parent={evt_ctx.parent_id if evt_ctx else None}, "
+                    f"user={evt_ctx.user_id if evt_ctx else None}"
                 )
                 self.hass.async_create_task(self.async_refresh())
 
@@ -265,8 +282,16 @@ class RollsCoordinator(DataUpdateCoordinator):
         return self.hass.data[DOMAIN][self.entry.entry_id]
 
     def _log_action(self, message: str) -> None:
-        """Log INFO + adaugă în log-ul de acțiuni (maxim 10 intrări)."""
-        _LOGGER.info(message)
+        """Log doar la nivel debug — nu apare în „Activitate recentă”.
+
+        Doar detecția operării manuale (`_log_manual_detected`) ajunge în
+        „Activitate recentă” / log-ul HA.
+        """
+        _LOGGER.debug(message)
+
+    def _log_manual_detected(self, message: str) -> None:
+        """Singurul eveniment care apare în „Activitate recentă” și în log-ul HA."""
+        _LOGGER.warning(message)
         self._action_log.append(
             f"[{datetime.now().strftime('%H:%M:%S')}] {message}"
         )
