@@ -51,24 +51,23 @@ cu prefix `v` (de exemplu, versiunea `1.3.17` folosește tag-ul `v1.3.17`).
    Repornește Home Assistant dacă este necesar.
    ```
 
-6. Arată utilizatorului diff-ul și sumarul înainte de commit. Nu executa
-   `git commit`, `git tag` sau `git push` fără cerere explicită.
-7. După confirmarea explicită, execută numai operațiile cerute. Crearea
-   tag-ului local și publicarea lui sunt acțiuni separate: nu face push fără
-   cerere explicită. Dacă release-ul este deja comis, nu repeta commit-ul.
+6. Arată utilizatorului diff-ul și sumarul înainte de commit.
+7. Execută `git commit`, `git tag` și `git push` numai când utilizatorul cere
+   explicit publicarea release-ului sau confirmă sumarul prezentat.
+8. După această cerere/confirmare, finalizează fluxul fără să ceri aprobări
+   separate pentru fiecare comandă. Dacă release-ul este deja comis, nu repeta
+   commit-ul. Creează tag-ul și împinge numai tag-ul versiunii release:
 
-   Pentru crearea tag-ului local:
-   Rulează `git tag vX.Y.Z`.
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
 
-   Pentru publicare, numai la cererea explicită:
-
-   Rulează `git push origin main --tags`.
-
-## Criterii de finalizare
+   Dacă utilizatorul cere doar pregătirea release-ului, nu publica nimic.
 
 ## Execuție consemnată
 
-- 2026-10-05: tag-ul local `v1.3.18` a fost creat la cererea utilizatorului; push-ul nu a fost cerut și nu a fost executat.
+- 2026-10-05: tag-ul `v1.3.18` a fost creat și publicat la cererea utilizatorului.
 
 ## Criterii de finalizare
 
