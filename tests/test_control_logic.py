@@ -112,6 +112,7 @@ def _build_coordinator(hass, entry, rt: dict) -> RollsCoordinator:
     coord._action_log = deque(maxlen=10)
     coord._cycle_log = deque(maxlen=6)
     coord._cycle_buf = []
+    coord._last_blocked_reason = None
     coord._coordinator_actions = {}
     coord._opening_in_progress = {}
     return coord
@@ -271,7 +272,7 @@ async def test_s4_sare_peste_auto_opened():
 
 
 @pytest.mark.asyncio
-async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate():
+async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate(caplog):
     """Surplusul redus oprește doar motoarele care depășesc capacitatea rămasă."""
     covers = ["cover.j1", "cover.j2", "cover.j3"]
     entry = _make_entry(covers=covers, motor_power=150.0)
@@ -295,7 +296,8 @@ async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate():
             "target_position": 100,
         }
 
-    await coord._apply_control_logic()
+    with caplog.at_level("INFO", logger="custom_components.rolls_ha.coordinator"):
+        await coord._apply_control_logic()
 
     assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
     assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_PENDING
@@ -304,6 +306,8 @@ async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate():
     hass.services.async_call.assert_called_once()
     assert hass.services.async_call.call_args[0][1] == "stop_cover"
     assert hass.services.async_call.call_args[0][2]["entity_id"] == "cover.j2"
+    assert "Deschidere amânată" in caplog.text
+    assert "200W" in caplog.text
 
 
 # ── S5: Control automat dezactivat ────────────────────────────────────────────
@@ -378,6 +382,28 @@ async def test_s8_toate_procesate_stop():
 
     await coord._apply_control_logic()
 
+    hass.services.async_call.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_logheaza_blocajul_cand_surplusul_e_suficient(caplog):
+    """Surplus suficient, dar toate jaluzelele sunt MANUAL: loghează cauza o dată."""
+    covers = ["cover.j1", "cover.j2"]
+    entry = _make_entry(covers=covers)
+    rt = _make_runtime(covers, cover_states={
+        "cover.j1": COVER_STATE_MANUAL,
+        "cover.j2": COVER_STATE_MANUAL,
+    })
+    hass = _make_hass(solar_w=1000, grid_w=500)
+    coord = _build_coordinator(hass, entry, rt)
+
+    with caplog.at_level("INFO", logger="custom_components.rolls_ha.coordinator"):
+        await coord._apply_control_logic()
+        await coord._apply_control_logic()
+
+    assert "Nicio jaluzea eligibilă" in caplog.text
+    assert "500W" in caplog.text
+    assert caplog.text.count("Nicio jaluzea eligibilă") == 1
     hass.services.async_call.assert_not_called()
 
 

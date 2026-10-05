@@ -86,6 +86,7 @@ class RollsCoordinator(DataUpdateCoordinator):
         self._action_log: deque[str] = deque(maxlen=10)
         self._cycle_log: deque[str] = deque(maxlen=6)
         self._cycle_buf: list[str] = []
+        self._last_blocked_reason: str | None = None
 
         # entity_id → {"time": datetime, "context_id": str, "target_position": int}
         self._coordinator_actions: dict[str, dict] = {}
@@ -289,6 +290,12 @@ class RollsCoordinator(DataUpdateCoordinator):
         """
         _LOGGER.debug(message)
 
+    def _log_blocked(self, reason: str, message: str) -> None:
+        """Loghează o singură dată fiecare motiv consecutiv care blochează deschiderea."""
+        if reason != self._last_blocked_reason:
+            _LOGGER.info(message)
+            self._last_blocked_reason = reason
+
     def _log_manual_detected(self, message: str) -> None:
         """Singurul eveniment care apare în „Activitate recentă” și în log-ul HA."""
         _LOGGER.warning(message)
@@ -399,6 +406,17 @@ class RollsCoordinator(DataUpdateCoordinator):
 
         # ── Control dezactivat ───────────────────────────────────────────
         if not auto_enabled:
+            pending_covers = [
+                eid for eid in cfg.get(CONF_COVERS, [])
+                if rt.get(f"cover_active_{eid}", True)
+                and cover_states.get(eid) == COVER_STATE_PENDING
+            ]
+            if pending_covers:
+                self._log_blocked(
+                    "auto_disabled",
+                    f"Deschidere blocată: controlul automat este dezactivat; "
+                    f"jaluzele în așteptare: {', '.join(pending_covers)}",
+                )
             self._clog("Control automat dezactivat — skip")
             self._flush_cycle_log()
             return
@@ -418,6 +436,12 @@ class RollsCoordinator(DataUpdateCoordinator):
                 cover_states[eid] = COVER_STATE_PENDING
                 await self._stop_cover(eid)
                 self._opening_in_progress.pop(eid)
+            self._log_blocked(
+                "active_motors_over_capacity:" + ",".join(excess_covers),
+                f"Deschidere amânată: surplusul de {virtual_surplus:.0f}W susține "
+                f"doar {available_motor_slots} motoare; oprite: "
+                f"{', '.join(excess_covers)}",
+            )
             self._log_action(
                 f"Surplus {virtual_surplus:.0f}W susține {available_motor_slots} motoare "
                 f"— surplus de motoare oprite, revin la PENDING"
@@ -445,6 +469,23 @@ class RollsCoordinator(DataUpdateCoordinator):
 
             if candidate is None:
                 self._clog("Nicio jaluzea PENDING — toate procesate sau dezactivate")
+                cover_reasons = []
+                for eid in covers_list:
+                    state = cover_states.get(eid, COVER_STATE_PENDING)
+                    if not rt.get(f"cover_active_{eid}", True):
+                        reason = "dezactivată"
+                    elif state != COVER_STATE_PENDING:
+                        reason = state
+                    else:
+                        continue
+                    cover_reasons.append(f"{eid}={reason}")
+                if cover_reasons:
+                    self._log_blocked(
+                        "no_eligible_cover:" + ",".join(cover_reasons),
+                        f"Nicio jaluzea eligibilă pentru deschidere, deși surplusul "
+                        f"este {virtual_surplus:.0f}W (prag {motor_power:.0f}W): "
+                        f"{', '.join(cover_reasons)}",
+                    )
                 self._flush_cycle_log()
                 return
 
@@ -469,6 +510,27 @@ class RollsCoordinator(DataUpdateCoordinator):
                 f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
                 f"— așteptare surplus"
             )
+            pending_covers = [
+                eid for eid in covers_list
+                if rt.get(f"cover_active_{eid}", True)
+                and cover_states.get(eid) == COVER_STATE_PENDING
+            ]
+            if pending_covers:
+                if grid_raw is None:
+                    self._log_blocked(
+                        "grid_sensor_unavailable",
+                        f"Deschidere blocată: senzorul de rețea "
+                        f"{cfg[CONF_GRID_SENSOR]} este indisponibil sau nenumeric; "
+                        f"nu se poate confirma surplusul necesar pentru "
+                        f"{', '.join(pending_covers)}",
+                    )
+                else:
+                    self._log_blocked(
+                        "insufficient_surplus",
+                        f"Deschidere blocată: surplus {virtual_surplus:.0f}W sub "
+                        f"pragul de {motor_power:.0f}W; jaluzele în așteptare: "
+                        f"{', '.join(pending_covers)}",
+                    )
 
         self._flush_cycle_log()
 
@@ -509,6 +571,7 @@ class RollsCoordinator(DataUpdateCoordinator):
             context=ctx,
             blocking=False,
         )
+        self._last_blocked_reason = None
 
         self._log_action(
             f"Deschidere {entity_id} la {target_position}% — surplus suficient"

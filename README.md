@@ -311,13 +311,26 @@ sau din **Configure** (options flow) fără restart:
 
 ### Adăugare jaluzele noi
 
-Oricând poți adăuga (sau elimina) jaluzele fără a reinstala integrarea:
+Oricând poți adăuga (sau elimina) jaluzele fără a reinstala integrarea. Dacă ai înlocuit releul unei jaluzele, configurează mai întâi noul releu în Home Assistant, prin integrarea producătorului (de exemplu Shelly), și verifică dacă jaluzeaua apare ca entitate de domeniu `cover`.
+
+Rolls acceptă entități `cover`, nu entități `switch` ale releului. Dacă releul apare doar ca `switch`, configurează-l în integrarea dispozitivului astfel încât Home Assistant să expună comenzile jaluzelei ca `cover` înainte să continui.
 
 **Settings → Devices & Services → Rolls Solar Controller → Configure →
 ⋮ → Reconfigure**
 
-Selectezi noua listă de jaluzele în ordinea dorită. Setările existente
-(poziție, activ) pentru jaluzelele rămase sunt păstrate.
+În formular, păstrează senzorii existenți și selectează noua listă de entități `cover` în ordinea dorită. Scoate entitatea veche dacă nu mai este folosită, apoi salvează. Setările existente (poziție, activ) pentru jaluzelele care rămân în listă sunt păstrate.
+
+### Actualizarea dashboard-ului
+
+După salvarea reconfigurării, integrarea reîncarcă platformele și regenerează fișierul:
+
+```text
+<config>/www/rolls_ha_dashboard.yaml
+```
+
+Verifică în fișier că apare noul `cover.<entity_id>`. Dacă entitatea lipsește, confirmă că ai selectat-o la reconfigurare și că este de domeniu `cover`.
+
+Integrarea regenerează fișierul YAML, dar nu modifică direct un dashboard Lovelace existent salvat în modul Storage sau creat prin copierea manuală a YAML-ului. Dacă noua jaluzea apare în fișier, dar nu și în dashboard, sincronizează dashboard-ul cu YAML-ul regenerat (de exemplu, actualizează configurația din **Edit dashboard → Raw configuration editor**) și reîncarcă pagina. Fă o copie a configurației existente înainte de a o înlocui, dacă ai personalizări.
 
 ---
 
