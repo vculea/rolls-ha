@@ -235,19 +235,19 @@ async def test_s3_actioneaza_dupa_stabilizare():
 
 @pytest.mark.asyncio
 async def test_s4_ordine_deschidere():
-    """S4: jaluzelele se deschid în ordinea din config, nu toate deodată."""
+    """S4: se deschid în ordine, până la capacitatea surplusului disponibil."""
     covers = ["cover.j1", "cover.j2", "cover.j3"]
     entry = _make_entry(covers=covers, motor_power=150.0, stabilization_delay=0)
     rt = _make_runtime(covers)
     hass = _make_hass(solar_w=1000, grid_w=500)  # surplus = 500W (≫ 150W)
     coord = _build_coordinator(hass, entry, rt)
 
-    # Prima rulare: deschide j1
+    # 500W susțin trei motoare de 150W; ordinea din config se păstrează.
     await coord._apply_control_logic()
     assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
-    assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_PENDING
-    assert rt[RUNTIME_COVER_STATES]["cover.j3"] == COVER_STATE_PENDING
-    assert hass.services.async_call.call_count == 1
+    assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_OPENING
+    assert rt[RUNTIME_COVER_STATES]["cover.j3"] == COVER_STATE_OPENING
+    assert hass.services.async_call.call_count == 3
 
 
 @pytest.mark.asyncio
@@ -268,6 +268,42 @@ async def test_s4_sare_peste_auto_opened():
     # j1 deja deschisă, j2 trebuie să fie următoarea
     assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_OPENING
     assert rt[RUNTIME_COVER_STATES]["cover.j3"] == COVER_STATE_PENDING
+
+
+@pytest.mark.asyncio
+async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate():
+    """Surplusul redus oprește doar motoarele care depășesc capacitatea rămasă."""
+    covers = ["cover.j1", "cover.j2", "cover.j3"]
+    entry = _make_entry(covers=covers, motor_power=150.0)
+    rt = _make_runtime(covers, cover_states={
+        "cover.j1": COVER_STATE_OPENING,
+        "cover.j2": COVER_STATE_OPENING,
+        "cover.j3": COVER_STATE_PENDING,
+    })
+    hass = _make_hass(
+        solar_w=500,
+        grid_w=-100,
+        cover_states={
+            "cover.j1": (30, "opening"),
+            "cover.j2": (30, "opening"),
+        },
+    )
+    coord = _build_coordinator(hass, entry, rt)
+    for eid in covers[:2]:
+        coord._opening_in_progress[eid] = {
+            "started": datetime.now() - timedelta(seconds=3),
+            "target_position": 100,
+        }
+
+    await coord._apply_control_logic()
+
+    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
+    assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_PENDING
+    assert rt[RUNTIME_COVER_STATES]["cover.j3"] == COVER_STATE_PENDING
+    assert list(coord._opening_in_progress) == ["cover.j1"]
+    hass.services.async_call.assert_called_once()
+    assert hass.services.async_call.call_args[0][1] == "stop_cover"
+    assert hass.services.async_call.call_args[0][2]["entity_id"] == "cover.j2"
 
 
 # ── S5: Control automat dezactivat ────────────────────────────────────────────

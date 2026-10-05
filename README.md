@@ -3,7 +3,8 @@
 Integrare personalizată pentru Home Assistant care deschide automat jaluzelele
 (storuri, rulouri, orice entitate `cover`) folosind surplusul de energie solară.
 Când panourile fotovoltaice produc mai mult decât consumi, integrarea deschide
-jaluzelele pe rând, în ordinea configurată, fără să consume energie din rețea.
+jaluzelele în ordinea configurată și poate porni simultan câte motoare susține
+surplusul disponibil, fără să consume energie din rețea.
 
 ## Cuprins
 
@@ -96,6 +97,9 @@ valoarea exportată în rețea scade cu 150 W. Fără compensare, calculul ar p�
 surplusul a dispărut și ar opri coada. Adăugând înapoi puterea motorului activ,
 sistemul vede surplusul real disponibil.
 
+Numărul de motoare care pot funcționa simultan este limitat la
+`floor(surplus_virtual / motor_power)`.
+
 ### Stările automatizării per jaluzea
 
 ```
@@ -111,18 +115,16 @@ O jaluzea cu `switch.activ_<jaluzea> = OFF` este sărită din coadă
 ### Logica de decizie (per ciclu)
 
 ```
-1. Calculează surplus_virtual
-2. Dacă surplus_virtual < motor_power și un motor e în mișcare:
-      → trimite stop_cover, jaluzea revine la PENDING
-      → la revenirea surplusului jaluzea va fi redeschisă
-3. Dacă vreun motor e în mișcare și surplus e OK — așteaptă finalizarea lui
-4. Parcurge coada PENDING; jaluzele deja la poziția țintă sunt marcate
+1. Calculează surplus_virtual și numărul de motoare susținute:
+  → `floor(surplus_virtual / motor_power)`
+2. Dacă motoarele active depășesc capacitatea:
+  → oprește ultimele motoare pornite; revin la PENDING
+3. Parcurge coada PENDING; jaluzelele deja la poziția țintă sunt marcate
    AUTO_OPENED instant și se sare la urm. fără a aștepta ciclul următor
-5. Dacă surplus_virtual ≥ motor_power:
-      → trimite cover.open_cover (sau set_cover_position dacă poziție < 100%)
-      → jaluzea devine OPENING; la finalizare → AUTO_OPENED
-      → continuă evaluarea pentru jaluzea următoare
-6. Dacă surplus_virtual < motor_power — rămâne PENDING, reîncearcă la ciclul următor
+4. Pornește jaluzelele următoare în ordinea configurată, până la capacitatea disponibilă
+  → trimite cover.open_cover (sau set_cover_position dacă poziție < 100%)
+  → fiecare jaluzea devine OPENING; la finalizare → AUTO_OPENED
+5. Dacă nu există capacitate pentru un motor nou, jaluzelele rămân PENDING
 ```
 
 ### Detectarea operării manuale
@@ -136,16 +138,16 @@ La fiecare serviciu apelat de coordinator se creează un `Context` propriu și s
 
 ### Tabel de decizii
 
-| Scenar | Surplus | Stare jaluzea | Activ | Rezultat                                      |
-| ------ | ------- | ------------- | ----- | --------------------------------------------- |
-| S1     | ≥ prag  | PENDING       | Da    | Deschidere imediată                           |
-| S2     | < prag  | PENDING       | Da    | Rămâne PENDING                                |
-| S3     | < prag  | OPENING       | Da    | stop_cover, revine la PENDING                 |
-| S4     | ≥ prag  | AUTO_OPENED   | Da    | Sărită (deja deschisă)                        |
-| S5     | orice   | MANUAL        | Da    | Sărită (operare manuală)                      |
-| S6     | orice   | orice         | Nu    | Sărită (dezactivată)                          |
-| S7     | ≥ prag  | PENDING       | Da    | Alt motor în mișcare (OK surplus) — așteptare |
-| S8     | orice   | PENDING       | Da    | Deja la poziția țintă → AUTO_OPENED instant   |
+| Scenar | Surplus           | Stare jaluzea | Activ | Rezultat                                             |
+| ------ | ----------------- | ------------- | ----- | ---------------------------------------------------- |
+| S1     | ≥ prag            | PENDING       | Da    | Deschidere imediată                                  |
+| S2     | < prag            | PENDING       | Da    | Rămâne PENDING                                       |
+| S3     | capacitate redusă | OPENING       | Da    | surplus de motoare oprite, revin la PENDING          |
+| S4     | ≥ prag            | AUTO_OPENED   | Da    | Sărită (deja deschisă)                               |
+| S5     | orice             | MANUAL        | Da    | Sărită (operare manuală)                             |
+| S6     | orice             | orice         | Nu    | Sărită (dezactivată)                                 |
+| S7     | ≥ prag            | PENDING       | Da    | Pornește dacă există capacitate pentru încă un motor |
+| S8     | orice             | PENDING       | Da    | Deja la poziția țintă → AUTO_OPENED instant          |
 
 ### Reset la miezul nopții
 
@@ -348,31 +350,32 @@ tests/
 
 ### Ce acoperă testele
 
-| Test                                             | Scenariu | Descriere                                                     |
-| ------------------------------------------------ | -------- | ------------------------------------------------------------- |
-| `test_s1_deschidere_la_surplus_suficient`        | S1       | Prima jaluzea PENDING se deschide când surplus ≥ prag         |
-| `test_s1_pozitie_partiala`                       | S1b      | `set_cover_position` folosit când target < 100%               |
-| `test_s2_surplus_insuficient_nu_deschide`        | S2       | Surplus < prag → rămâne PENDING                               |
-| `test_s2_reset_timer_la_scadere_surplus`         | S2b      | Jaluzea în deschidere + surplus scade → stop_cover + PENDING  |
-| `test_s3_asteapta_stabilizare`                   | S3       | Surplus suficient → deschidere imediată (fără delay)          |
-| `test_s3_actioneaza_dupa_stabilizare`            | S3b      | Surplus prezent → deschide (timer ignorat)                    |
-| `test_s4_ordine_deschidere`                      | S4       | Câte una pe rând, nu toate deodată                            |
-| `test_s4_sare_peste_auto_opened`                 | S4b      | AUTO_OPENED sărită, continuă cu PENDING                       |
-| `test_s5_auto_off_nu_actioneaza`                 | S5       | Control global OFF → nicio acțiune                            |
-| `test_s6_cover_dezactivata_sarire`               | S6       | Jaluzea dezactivată sărită, continuă cu următoarea            |
-| `test_s7_manual_sarita`                          | S7       | MANUAL sărită în coadă                                        |
-| `test_s8_toate_procesate_stop`                   | S8       | Toate AUTO_OPENED/MANUAL → nicio acțiune                      |
-| `test_s9_conventie_retea_inversa`                | S9       | Surplus calculat corect cu semn inversat                      |
-| `test_s10_surplus_virtual_motor_activ`           | S10      | Motor activ adaugă puterea înapoi la surplus                  |
-| `test_m1_schimbare_manuala_markare`              | M1       | Schimbare fără context coordinator → MANUAL                   |
-| `test_m2_schimbare_in_grace_period_ignorata`     | M2       | Schimbare în grace period → nu e MANUAL                       |
-| `test_m3_schimbare_context_coordinator_ignorata` | M3       | Context match → ignorată                                      |
-| `test_m4_auto_opened_devine_manual_la_inchidere` | M4       | AUTO_OPENED → MANUAL la închidere manuală                     |
-| `test_m5_capatul_de_cursa_nu_e_manual`           | M5       | Capăt de cursă fizic (context Shelly) nu e detectat ca manual |
-| `test_r1_reset_midnight_pending`                 | R1       | Toate stările → PENDING la miezul nopții                      |
-| `test_r2_reset_nu_atinge_dezactivate`            | R2       | Dezactivate nu sunt resetate                                  |
-| `test_r3_reset_sterge_timer_stabilizare`         | R3       | Timer de stabilizare curățat la reset                         |
-| `test_r4_reset_sterge_opening_in_progress`       | R4       | Mișcări în curs și acțiuni curățate la reset                  |
+| Test                                                           | Scenariu | Descriere                                                     |
+| -------------------------------------------------------------- | -------- | ------------------------------------------------------------- |
+| `test_s1_deschidere_la_surplus_suficient`                      | S1       | Prima jaluzea PENDING se deschide când surplus ≥ prag         |
+| `test_s1_pozitie_partiala`                                     | S1b      | `set_cover_position` folosit când target < 100%               |
+| `test_s2_surplus_insuficient_nu_deschide`                      | S2       | Surplus < prag → rămâne PENDING                               |
+| `test_s2_reset_timer_la_scadere_surplus`                       | S2b      | Jaluzea în deschidere + surplus scade → stop_cover + PENDING  |
+| `test_s3_asteapta_stabilizare`                                 | S3       | Surplus suficient → deschidere imediată (fără delay)          |
+| `test_s3_actioneaza_dupa_stabilizare`                          | S3b      | Surplus prezent → deschide (timer ignorat)                    |
+| `test_s4_ordine_deschidere`                                    | S4       | Deschideri simultane în ordinea configurată                   |
+| `test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate` | S4c      | Oprește motoarele peste capacitatea redusă                    |
+| `test_s4_sare_peste_auto_opened`                               | S4b      | AUTO_OPENED sărită, continuă cu PENDING                       |
+| `test_s5_auto_off_nu_actioneaza`                               | S5       | Control global OFF → nicio acțiune                            |
+| `test_s6_cover_dezactivata_sarire`                             | S6       | Jaluzea dezactivată sărită, continuă cu următoarea            |
+| `test_s7_manual_sarita`                                        | S7       | MANUAL sărită în coadă                                        |
+| `test_s8_toate_procesate_stop`                                 | S8       | Toate AUTO_OPENED/MANUAL → nicio acțiune                      |
+| `test_s9_conventie_retea_inversa`                              | S9       | Surplus calculat corect cu semn inversat                      |
+| `test_s10_surplus_virtual_motor_activ`                         | S10      | Motor activ adaugă puterea înapoi la surplus                  |
+| `test_m1_schimbare_manuala_markare`                            | M1       | Schimbare fără context coordinator → MANUAL                   |
+| `test_m2_schimbare_in_grace_period_ignorata`                   | M2       | Schimbare în grace period → nu e MANUAL                       |
+| `test_m3_schimbare_context_coordinator_ignorata`               | M3       | Context match → ignorată                                      |
+| `test_m4_auto_opened_devine_manual_la_inchidere`               | M4       | AUTO_OPENED → MANUAL la închidere manuală                     |
+| `test_m5_capatul_de_cursa_nu_e_manual`                         | M5       | Capăt de cursă fizic (context Shelly) nu e detectat ca manual |
+| `test_r1_reset_midnight_pending`                               | R1       | Toate stările → PENDING la miezul nopții                      |
+| `test_r2_reset_nu_atinge_dezactivate`                          | R2       | Dezactivate nu sunt resetate                                  |
+| `test_r3_reset_sterge_timer_stabilizare`                       | R3       | Timer de stabilizare curățat la reset                         |
+| `test_r4_reset_sterge_opening_in_progress`                     | R4       | Mișcări în curs și acțiuni curățate la reset                  |
 
 ---
 

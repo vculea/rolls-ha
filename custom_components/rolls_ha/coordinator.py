@@ -6,10 +6,10 @@ Logica de control:
                     + motor_power  ×  nr_jaluzele_aflate_în_mișcare
 
   Coada de deschidere (per zi):
-    - Jaluzele în stare PENDING sunt deschise pe rând când surplus_virtual >= motor_power
+    - Jaluzelele PENDING sunt deschise în ordine, în limita puterii disponibile
     - Surplusul trebuie să fie stabil (>= prag) timp de `stabilization_delay` secunde
-    - După trimiterea comenzii se așteptă finalizarea mișcării înainte de jaluzea urm.
-    - Dacă surplusul scade sub prag, coada se oprește (jaluzele deja deschise rămân)
+    - Pot funcționa simultan mai multe motoare dacă surplusul le susține
+    - Dacă surplusul scade, sunt oprite motoarele peste capacitatea disponibilă
 
   Detectare operare manuală:
     - La fiecare serviciu apelat de coordinator se reține context_id + timestamp
@@ -403,40 +403,39 @@ class RollsCoordinator(DataUpdateCoordinator):
             self._flush_cycle_log()
             return
 
-        # ── Întrerupem deschiderea dacă surplusul a scăzut sub prag ──────
-        if self._opening_in_progress and virtual_surplus < motor_power:
-            for eid in list(self._opening_in_progress.keys()):
+        # ── Limităm motoarele active la capacitatea surplusului ──────────
+        covers_list: list[str] = cfg.get(CONF_COVERS, [])
+        available_motor_slots = (
+            len(covers_list)
+            if motor_power <= 0
+            else max(0, int(virtual_surplus // motor_power))
+        )
+        active_covers = list(self._opening_in_progress)
+        if len(active_covers) > available_motor_slots:
+            excess_count = len(active_covers) - available_motor_slots
+            excess_covers = active_covers[-excess_count:]
+            for eid in reversed(excess_covers):
                 cover_states[eid] = COVER_STATE_PENDING
                 await self._stop_cover(eid)
                 self._opening_in_progress.pop(eid)
             self._log_action(
-                f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
-                f"— jaluzea oprită, revine la PENDING"
+                f"Surplus {virtual_surplus:.0f}W susține {available_motor_slots} motoare "
+                f"— surplus de motoare oprite, revin la PENDING"
             )
             self._flush_cycle_log()
             return
 
-        # ── Așteptăm finalizarea jaluzea curentă ─────────────────────────
+        # ── Selectăm în ordine jaluzelele pentru locurile disponibile ─────
         if self._opening_in_progress:
-            in_progress_eid = next(iter(self._opening_in_progress))
-            elapsed = (
-                datetime.now() - self._opening_in_progress[in_progress_eid]["started"]
-            ).total_seconds()
             self._clog(
-                f"Jaluzea {in_progress_eid} se deschide ({elapsed:.0f}s)..."
+                f"Motoare active: {len(self._opening_in_progress)}/"
+                f"{available_motor_slots}"
             )
-            self._flush_cycle_log()
-            return
 
         # ── Găsim prima jaluzea PENDING care chiar necesită deschidere ─────
         # Jaluzele deja la poziția țintă sunt marcate AUTO_OPENED instant,
         # fără a reseta timer-ul de stabilizare, și se trece imediat la urm.
-        covers_list: list[str] = cfg.get(CONF_COVERS, [])
-        next_pending_eid: str | None = None
-        target_pos: int = DEFAULT_OPEN_POSITION
-        current_pos: int | None = None
-
-        while True:
+        while len(self._opening_in_progress) < available_motor_slots:
             candidate: str | None = None
             for eid in covers_list:
                 active = rt.get(f"cover_active_{eid}", True)
@@ -457,20 +456,15 @@ class RollsCoordinator(DataUpdateCoordinator):
                     f"Jaluzea {candidate}: deja la {current_pos}% "
                     f"(țintă {target_pos}%) — marcată ca deschisă automat, trec la urm."
                 )
-                # Nu resetăm timer-ul; trecem imediat la urm. jaluzea din coadă
                 continue
 
-            next_pending_eid = candidate
-            break
-
-        # ── Deschidere imediată când surplusul e suficient ───────────────
-        if virtual_surplus >= motor_power:
             self._clog(
-                f"Surplus {virtual_surplus:.0f}W ≥ prag {motor_power:.0f}W "
-                f"— deschid {next_pending_eid}"
+                f"Surplus {virtual_surplus:.0f}W susține un motor nou "
+                f"— deschid {candidate}"
             )
-            await self._open_cover(next_pending_eid, target_pos, rt, cover_states)
-        else:
+            await self._open_cover(candidate, target_pos, rt, cover_states)
+
+        if available_motor_slots == 0:
             self._clog(
                 f"Surplus {virtual_surplus:.0f}W < prag {motor_power:.0f}W "
                 f"— așteptare surplus"
