@@ -28,7 +28,7 @@ COVER_STATE_AUTO_OPENED = "auto_opened"
 COVER_STATE_MANUAL = "manual"
 
 # ── Default values ────────────────────────────────────────────────────────────────
-DEFAULT_MOTOR_POWER = 150.0         # W — estimated motor draw while opening
+DEFAULT_MOTOR_POWER = 130.0         # W — estimated motor draw while opening
 DEFAULT_STABILIZATION_DELAY = 10    # seconds — surplus must stay above threshold
 DEFAULT_OPEN_POSITION = 100         # % — fully open
 OPENING_TIMEOUT = 120               # seconds — max wait for cover to finish moving

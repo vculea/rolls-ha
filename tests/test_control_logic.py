@@ -252,6 +252,25 @@ async def test_s4_ordine_deschidere():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(("surplus_w", "expected_openings"), [(140, 1), (260, 2)])
+async def test_s4_capacitate_la_consum_motor_130w(surplus_w, expected_openings):
+    """Surplusul permite doar numărul de motoare acoperite de 130W fiecare."""
+    covers = ["cover.j1", "cover.j2", "cover.j3"]
+    entry = _make_entry(covers=covers, motor_power=130.0, stabilization_delay=0)
+    rt = _make_runtime(covers, motor_power=130.0)
+    hass = _make_hass(solar_w=1000, grid_w=surplus_w)
+    coord = _build_coordinator(hass, entry, rt)
+
+    await coord._apply_control_logic()
+
+    assert hass.services.async_call.call_count == expected_openings
+    assert sum(
+        state == COVER_STATE_OPENING
+        for state in rt[RUNTIME_COVER_STATES].values()
+    ) == expected_openings
+
+
+@pytest.mark.asyncio
 async def test_s4_sare_peste_auto_opened():
     """S4b: jaluzelele AUTO_OPENED sunt sărite, se continuă cu PENDING."""
     covers = ["cover.j1", "cover.j2", "cover.j3"]
