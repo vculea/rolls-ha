@@ -1,6 +1,6 @@
 ---
 name: rolls-ha-release
-description: "Pregătește release-uri pentru integrarea Home Assistant Rolls Solar Controller: verifică schimbările locale, actualizează versiunea manifestului, rulează testele, generează notele GitHub Release și validează tag-ul. Folosește pentru release, version bump, changelog, release notes sau publicarea unei versiuni noi."
+description: "Pregătește și publică release-uri pentru integrarea Home Assistant Rolls Solar Controller: verifică schimbările locale, actualizează versiunea manifestului, rulează testele, face commit, tag și push la branch și tag, apoi generează sumarul GitHub Release. Folosește pentru release, version bump, changelog, release notes sau publicarea unei versiuni noi."
 argument-hint: "Versiunea dorită sau 'următorul patch release'"
 user-invocable: true
 ---
@@ -9,10 +9,15 @@ user-invocable: true
 
 ## Scop
 
-Pregătește un release reproductibil pentru acest repository fără să publice
-automat modificări sau să șteargă lucru local. Release-ul trebuie să păstreze
-aceeași versiune în `custom_components/rolls_ha/manifest.json` și în tag-ul Git
-cu prefix `v` (de exemplu, versiunea `1.3.17` folosește tag-ul `v1.3.17`).
+Pregătește și publică un release reproductibil pentru acest repository. O cerere
+de release înseamnă implicit: teste, commit al schimbărilor release-ului, tag,
+push la branch-ul curent și push la tag, apoi sumarul pentru GitHub Release. Nu
+cere confirmări intermediare. Publică numai dacă utilizatorul cere explicit
+„doar pregătire” sau „fără publicare”. Nu șterge și nu suprascrie modificări
+locale și nu include automat fișiere fără legătură, secrete sau artefacte
+generate. Release-ul trebuie să păstreze aceeași versiune în
+`custom_components/rolls_ha/manifest.json` și în tag-ul Git cu prefix `v` (de
+exemplu, versiunea `1.3.17` folosește tag-ul `v1.3.17`).
 
 ## Procedură
 
@@ -51,19 +56,36 @@ cu prefix `v` (de exemplu, versiunea `1.3.17` folosește tag-ul `v1.3.17`).
    Repornește Home Assistant dacă este necesar.
    ```
 
-6. Arată utilizatorului diff-ul și sumarul înainte de commit.
-7. Execută `git commit`, `git tag` și `git push` numai când utilizatorul cere
-   explicit publicarea release-ului sau confirmă sumarul prezentat.
-8. După această cerere/confirmare, finalizează fluxul fără să ceri aprobări
-   separate pentru fiecare comandă. Dacă release-ul este deja comis, nu repeta
-   commit-ul. Creează tag-ul și împinge numai tag-ul versiunii release:
+6. Revizuiește diff-ul complet și pregătește sumarul release-ului, dar nu
+   aștepta aprobarea utilizatorului. Include schimbările intenționate pentru
+   release din cod, teste, documentație și manifest; lasă fișierele fără legătură,
+   secrete și artefactele generate în afara commit-ului.
+7. Verifică indexul Git înainte de staging. Nu include și nu elimina modificări
+   staged preexistente care nu fac parte clar din release. Dacă nu poți separa
+   sigur schimbările release-ului de lucru fără legătură, oprește-te și raportează
+   blocajul fără să pierzi modificări. Altfel, stage-uiește explicit fișierele
+   release-ului și creează un commit descriptiv, de exemplu
+   `release: vX.Y.Z - descriere scurtă`. Dacă acel commit există deja, nu-l repeta.
+8. După commit, creează tag-ul `vX.Y.Z` pe commit-ul release-ului. Apoi împinge
+   branch-ul curent și tag-ul la `origin`, fără force-push:
 
    ```bash
    git tag vX.Y.Z
+   git push origin <branch-curent>
    git push origin vX.Y.Z
    ```
 
-   Dacă utilizatorul cere doar pregătirea release-ului, nu publica nimic.
+   Ordinea corectă este commit, tag, push branch, push tag. Verifică apoi că
+   branch-ul și tag-ul sunt vizibile pe remote și că tag-ul pointează la commit-ul
+   release-ului. Dacă release-ul este deja comis, nu repeta commit-ul; dacă tag-ul
+   există deja, nu-l muta și nu-l suprascrie. Dacă testele eșuează, tag-ul
+   aparține altui commit sau push-ul eșuează, oprește pașii rămași și raportează
+   exact ce a fost deja publicat și ce nu.
+
+9. După publicarea reușită, afișează sumarul GitHub Release în formatul de la
+   pasul 5, împreună cu rezultatul testelor, avertismentele, commit-ul și tag-ul.
+   Pentru cererea explicită „doar pregătire” sau „fără publicare”, nu face commit,
+   tag sau push și prezintă sumarul după validări.
 
 ## Execuție consemnată
 
@@ -73,6 +95,6 @@ cu prefix `v` (de exemplu, versiunea `1.3.17` folosește tag-ul `v1.3.17`).
 
 - manifestul conține versiunea release-ului;
 - testele sunt trecute sau rezultatul este raportat clar;
-- tag-ul nu exista înainte de pregătire;
+- commit-ul release-ului, tag-ul și branch-ul au fost împinse și verificate pe remote;
 - sumarul nu conține afirmații neacoperite de diff sau teste;
 - modificările utilizatorului și fișierele fără legătură rămân intacte.
