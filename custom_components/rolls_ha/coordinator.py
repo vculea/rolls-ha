@@ -2,8 +2,8 @@
 
 Logica de control:
 
-  surplus_virtual = grid_export
-                    + motor_power  ×  nr_jaluzele_aflate_în_mișcare
+    surplus_virtual = grid_export + compensare_confirmată
+    compensare_confirmată ≤ scăderea exportului observată de la pornirea motoarelor
 
   Coada de deschidere (per zi):
     - Jaluzelele PENDING sunt deschise în ordine, în limita puterii disponibile
@@ -371,7 +371,7 @@ class RollsCoordinator(DataUpdateCoordinator):
             grid_export = grid_raw if grid_positive_is_export else -grid_raw
 
         # ── Surplus virtual ──────────────────────────────────────────────
-        # Adaugă puterea motoarelor active pentru a evita false-negative
+        active_grid_levels: list[float] = []
         virtual_surplus = grid_export
 
         for eid, opening_info in list(self._opening_in_progress.items()):
@@ -395,8 +395,17 @@ class RollsCoordinator(DataUpdateCoordinator):
                     f"Jaluzea {eid}: deschidere finalizată la {actual_pos}%"
                 )
             else:
-                # Motor încă rulează — adaugă puterea înapoi la surplus virtual
-                virtual_surplus += motor_power
+                active_grid_levels.append(
+                    opening_info.get("grid_export_at_start", grid_export)
+                )
+
+        if motor_power > 0 and active_grid_levels:
+            # Compensează consumul numai după ce contorul a reflectat o scădere.
+            observed_drop = max(0.0, max(active_grid_levels) - grid_export)
+            virtual_surplus += min(
+                len(active_grid_levels) * motor_power,
+                observed_drop,
+            )
 
         self._clog(
             f"solar={f'{solar_raw:.0f}' if solar_raw is not None else 'N/A'}W  "
@@ -503,7 +512,9 @@ class RollsCoordinator(DataUpdateCoordinator):
                 f"Surplus {virtual_surplus:.0f}W susține un motor nou "
                 f"— deschid {candidate}"
             )
-            await self._open_cover(candidate, target_pos, rt, cover_states)
+            await self._open_cover(
+                candidate, target_pos, rt, cover_states, grid_export
+            )
 
         if available_motor_slots == 0:
             self._clog(
@@ -540,6 +551,7 @@ class RollsCoordinator(DataUpdateCoordinator):
         target_position: int,
         rt: dict,
         cover_states: dict,
+        grid_export: float,
     ) -> None:
         """Trimite comanda de deschidere și înregistrează acțiunea coordinator-ului."""
         cover_states[entity_id] = COVER_STATE_OPENING
@@ -547,6 +559,7 @@ class RollsCoordinator(DataUpdateCoordinator):
         self._opening_in_progress[entity_id] = {
             "started": datetime.now(),
             "target_position": target_position,
+            "grid_export_at_start": grid_export,
         }
 
         # Creează un Context propriu pentru a putea distinge de acțiuni manuale

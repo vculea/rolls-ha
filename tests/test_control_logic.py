@@ -189,6 +189,7 @@ async def test_s2_reset_timer_la_scadere_surplus():
     coord._opening_in_progress["cover.j1"] = {
         "started": datetime.now() - timedelta(seconds=3),
         "target_position": 100,
+        "grid_export_at_start": 100.0,
     }
 
     await coord._apply_control_logic()
@@ -271,6 +272,23 @@ async def test_s4_capacitate_la_consum_motor_130w(surplus_w, expected_openings):
 
 
 @pytest.mark.asyncio
+async def test_s4_nu_dubleaza_surplusul_cu_senzor_neactualizat():
+    """O citire neschimbată nu trebuie să creeze capacitate pentru alt motor."""
+    covers = ["cover.j1", "cover.j2", "cover.j3"]
+    entry = _make_entry(covers=covers, motor_power=130.0, stabilization_delay=0)
+    rt = _make_runtime(covers, motor_power=130.0)
+    hass = _make_hass(solar_w=1000, grid_w=140)
+    coord = _build_coordinator(hass, entry, rt)
+
+    await coord._apply_control_logic()
+    await coord._apply_control_logic()
+
+    assert rt[RUNTIME_COVER_STATES]["cover.j1"] == COVER_STATE_OPENING
+    assert rt[RUNTIME_COVER_STATES]["cover.j2"] == COVER_STATE_PENDING
+    assert hass.services.async_call.call_count == 1
+
+
+@pytest.mark.asyncio
 async def test_s4_sare_peste_auto_opened():
     """S4b: jaluzelele AUTO_OPENED sunt sărite, se continuă cu PENDING."""
     covers = ["cover.j1", "cover.j2", "cover.j3"]
@@ -313,6 +331,7 @@ async def test_s4_surplus_scazut_opreste_doar_motorul_peste_capacitate(caplog):
         coord._opening_in_progress[eid] = {
             "started": datetime.now() - timedelta(seconds=3),
             "target_position": 100,
+            "grid_export_at_start": 200.0,
         }
 
     with caplog.at_level("INFO", logger="custom_components.rolls_ha.coordinator"):
@@ -466,6 +485,7 @@ async def test_s10_surplus_virtual_motor_activ():
     coord._opening_in_progress["cover.j1"] = {
         "started": datetime.now() - timedelta(seconds=10),
         "target_position": 100,
+        "grid_export_at_start": 200.0,
     }
     # Simulează acoperă în mișcare
     def _get_state_moving(entity_id):

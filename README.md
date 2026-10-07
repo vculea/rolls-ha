@@ -89,13 +89,16 @@ surplus = grid_export
         = grid_raw          (dacă convenție: pozitiv = export)
         = -grid_raw         (dacă convenție: pozitiv = import — Shelly EM standard)
 
-surplus_virtual = surplus + motor_power × nr_jaluzele_în_mișcare
+scadere_observata = max(0, max(grid_export_la_pornire) - grid_export_curent)
+compensare = min(motor_power × nr_jaluzele_în_mișcare, scadere_observata)
+surplus_virtual = grid_export_curent + compensare
 ```
 
-**De ce surplus virtual?** Când un motor de jaluzea rulează (consumă ~150 W),
-valoarea exportată în rețea scade cu 150 W. Fără compensare, calculul ar părea că
-surplusul a dispărut și ar opri coada. Adăugând înapoi puterea motorului activ,
-sistemul vede surplusul real disponibil.
+**De ce surplus virtual?** Când un motor de jaluzea rulează, valoarea exportată în
+rețea scade. Puterea motoarelor active este compensată doar în limita scăderii
+observate de la pornire și nu mai mult decât consumul estimat al acestora. Astfel,
+o citire rămasă neschimbată nu este numărată din nou ca surplus și nu pornește
+suplimentar alte motoare.
 
 Numărul de motoare care pot funcționa simultan este limitat la
 `floor(surplus_virtual / motor_power)`.
@@ -188,7 +191,7 @@ Atributele `sensor.status_<jaluzea>` sunt citite **live** din entitatea cover su
 
 | Entitate                              | Domeniu   | Default | Descriere                                       |
 | ------------------------------------- | --------- | ------- | ----------------------------------------------- |
-| `number.prag_putere_motor`            | 10–5000 W | 150 W   | Surplusul minim necesar pentru a porni un motor |
+| `number.prag_putere_motor`            | 10–5000 W | 130 W   | Surplusul minim necesar pentru a porni un motor |
 | `number.pozitie_deschidere_<jaluzea>` | 10–100 %  | 100 %   | La ce procent se deschide jaluzea respectivă    |
 
 ---
@@ -295,7 +298,7 @@ Ordinea poate fi schimbată oricând din **Reconfigure**.
 
 | Câmp         | Default | Descriere                                                        |
 | ------------ | ------- | ---------------------------------------------------------------- |
-| Putere motor | 150 W   | Surplusul minim necesar; de obicei consumul motorului în mișcare |
+| Putere motor | 130 W   | Surplusul minim necesar; de obicei consumul motorului în mișcare |
 
 ---
 
@@ -306,7 +309,7 @@ sau din **Configure** (options flow) fără restart:
 
 | Setare                         | Default | Descriere                                                              |
 | ------------------------------ | ------- | ---------------------------------------------------------------------- |
-| Prag putere motor              | 150 W   | Schimbă pragul global (ex. 200 W dacă motoarele tale consumă mai mult) |
+| Prag putere motor              | 130 W   | Schimbă pragul global (ex. 200 W dacă motoarele tale consumă mai mult) |
 | Poziție deschidere per jaluzea | 100 %   | Deschide la 80% pentru intimitate, 100% pentru lumină maximă           |
 
 ### Adăugare jaluzele noi
