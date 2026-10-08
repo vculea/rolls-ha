@@ -398,7 +398,7 @@ tests/
 ## Release
 
 Pentru pregătirea unui release nou, folosește skill-ul
-`.github/skills/rolls-ha-release/SKILL.md`. Acesta verifică modificările locale,
+`.github/skills/release/SKILL.md`. Acesta verifică modificările locale,
 rulează testele, actualizează versiunea și generează sumarul pentru GitHub Release.
 
 ### Pași pentru publicarea unui release nou
