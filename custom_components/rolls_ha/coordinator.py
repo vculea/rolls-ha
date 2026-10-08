@@ -61,7 +61,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(seconds=30)
+SCAN_INTERVAL = timedelta(seconds=3)
 
 # Stările în care coordinator-ul poate detecta operare manuală
 _TRACKABLE_STATES = (COVER_STATE_PENDING, COVER_STATE_OPENING, COVER_STATE_AUTO_OPENED)
@@ -130,7 +130,7 @@ class RollsCoordinator(DataUpdateCoordinator):
                 self._debounce_unsub = None
                 self.hass.async_create_task(self.async_refresh())
 
-            self._debounce_unsub = async_call_later(self.hass, 3, _do_refresh)
+            self._debounce_unsub = async_call_later(self.hass, 1, _do_refresh)
 
         unsub = async_track_state_change_event(self.hass, watch, _sensor_changed)
         self._unsub_listeners.append(unsub)
